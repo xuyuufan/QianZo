@@ -1,0 +1,26 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+coverage/
+
+# Local environment values. Keep templates tracked.
+.env*
+!.env.example
+!.env.tools.example
+
+# Test output and browser sessions
+playwright/.auth/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Local Supabase state
+supabase/.branches/
+supabase/.temp/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
