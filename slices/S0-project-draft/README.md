@@ -1,6 +1,6 @@
 # S0：真实登录与自己的项目草稿
 
-**状态：待实施。等级：V0 REQUIRED。对应 IBQ-01～03。** 本文件是施工规格，不表示已经安装依赖、建立 Git、运行服务或通过测试。
+**状态：已实施并完成本地验收（2026-09-22）。等级：V0 REQUIRED。对应 IBQ-01～03。** 本文件保留施工规格；实际环境、验证和提交状态见 [PROJECT_STATUS](../../PROJECT_STATUS.md)。
 
 目标：企业使用真实 Supabase 登录后，可以创建、读取、修改自己的项目草稿；刷新后数据仍在；另一企业无法读取或修改该项目。
 
@@ -129,7 +129,7 @@ updateProjectDraft({ projectId, expectedVersion, title, originalRequirement })
 
 ## 7. 必须交付的本地工具与说明
 
-以下是 S0 必须建立的 scripts 接口，当前尚不存在；实施后 README 应记录实际底层命令与验证结果。
+以下 S0 scripts 接口已经建立；实际使用顺序和验证结果记录在根 README 与 `PROJECT_STATUS.md`。
 
 | scripts | 用途 |
 |---|---|
