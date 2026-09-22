@@ -37,6 +37,199 @@ select {
   padding: 2rem;
 }
 
+.auth-shell,
+.workspace-shell {
+  min-height: 100vh;
+  padding: clamp(1rem, 4vw, 3rem);
+}
+
+.auth-shell {
+  display: grid;
+  place-items: center;
+}
+
+.auth-card {
+  display: grid;
+  width: min(100%, 52rem);
+  gap: 2rem;
+  padding: clamp(1.5rem, 5vw, 3.5rem);
+  border: 1px solid var(--line);
+  border-radius: 1.5rem;
+  background: var(--surface);
+  box-shadow: 0 1.5rem 4rem rgb(16 42 42 / 10%);
+}
+
+.section-title {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 3.75rem);
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.form-stack {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.5rem;
+  color: var(--ink);
+  font-size: 0.925rem;
+  font-weight: 650;
+}
+
+.field input {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #aebfba;
+  border-radius: 0.75rem;
+  background: #fbfdfc;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.field input:focus,
+.choice-card:has(input:focus-visible) {
+  outline: 3px solid rgb(0 107 95 / 22%);
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+
+.button {
+  min-height: 3rem;
+  padding: 0.75rem 1.1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.75rem;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.button.secondary {
+  margin-top: 1.5rem;
+  background: transparent;
+  color: var(--accent);
+}
+
+.text-button {
+  padding: 0.4rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.form-message {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.75rem;
+  font-size: 0.925rem;
+}
+
+.form-message.error {
+  border: 1px solid #d9a4a0;
+  background: #fff3f2;
+  color: #8f2018;
+}
+
+.role-fieldset {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.role-fieldset legend {
+  margin-bottom: 0.5rem;
+  font-size: 0.925rem;
+  font-weight: 650;
+}
+
+.choice-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  cursor: pointer;
+}
+
+.choice-card:has(input:checked) {
+  border-color: var(--accent);
+  background: rgb(0 107 95 / 6%);
+}
+
+.choice-card input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0.15rem 0 0;
+  accent-color: var(--accent);
+}
+
+.choice-card span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.choice-card small {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0.5rem 0 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.topbar-label {
+  margin-left: 1rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.empty-state {
+  max-width: 48rem;
+  margin: clamp(4rem, 12vh, 8rem) auto 0;
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  background: var(--surface);
+}
+
+@media (min-width: 48rem) {
+  .auth-card {
+    grid-template-columns: minmax(0, 0.85fr) minmax(18rem, 1fr);
+    align-items: start;
+  }
+
+  .auth-card > form:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 .panel {
   width: min(100%, 42rem);
   padding: clamp(2rem, 6vw, 4rem);

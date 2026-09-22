@@ -1,10 +1,27 @@
-export default function HomePage() {
+import { redirect } from "next/navigation";
+
+import { signOutAction } from "@/app/actions/auth";
+import { getActorById } from "@/modules/identity/service";
+import { getVerifiedUserId } from "@/platform/auth/server";
+
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const userId = await getVerifiedUserId();
+  if (!userId) redirect("/sign-in");
+
+  const actor = await getActorById(userId);
+  if (!actor) redirect("/onboarding");
+  if (actor.status === "DISABLED") redirect("/onboarding");
+  if (actor.roles.includes("ENTERPRISE")) redirect("/enterprise/projects");
+
   return (
-    <main className="shell">
+    <main className="auth-shell">
       <section className="panel" aria-labelledby="page-title">
-        <p className="eyebrow">S0 · 项目草稿</p>
-        <h1 id="page-title">Qianzo</h1>
-        <p className="lede">真实登录与项目草稿功能正在接入。</p>
+        <p className="eyebrow">Builder</p>
+        <h1 id="page-title" className="section-title">已登录</h1>
+        <p className="lede">接单功能将在后续切片开放。</p>
+        <form action={signOutAction}><button className="button secondary">退出登录</button></form>
       </section>
     </main>
   );

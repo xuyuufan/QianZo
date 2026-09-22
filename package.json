@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/clean-next-dev.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -18,7 +19,8 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:prepare": "node scripts/db-prepare.mjs",
-    "db:reset": "node scripts/db-reset.mjs"
+    "db:reset": "node scripts/db-reset.mjs",
+    "demo:seed": "tsx scripts/demo-seed.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
@@ -40,6 +42,7 @@
     "dotenv": "18.0.2",
     "eslint-config-next": "16.3.5",
     "supabase": "2.117.0",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "5.0.1"
   }

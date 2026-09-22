@@ -44,3 +44,13 @@
 - 当前文件位置是实际入口。未来移动到 docs 时，同步修正链接，避免两个并列权威版本。
 - 架构和产品规则变动时更新对应权威文档，不能只改代码或依靠聊天记录解释。
 - 当前尚未建立应用脚本；启动、构建和测试命令以实施后真实存在的配置为准，不虚构已通过的检查。
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
