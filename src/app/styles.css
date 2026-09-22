@@ -79,7 +79,8 @@ select {
   font-weight: 650;
 }
 
-.field input {
+.field input,
+.field textarea {
   width: 100%;
   min-height: 3rem;
   padding: 0.75rem 0.9rem;
@@ -90,7 +91,14 @@ select {
   font-size: 1rem;
 }
 
+.field textarea {
+  min-height: 12rem;
+  resize: vertical;
+  line-height: 1.6;
+}
+
 .field input:focus,
+.field textarea:focus,
 .choice-card:has(input:focus-visible) {
   outline: 3px solid rgb(0 107 95 / 22%);
   outline-offset: 2px;
@@ -119,6 +127,13 @@ select {
   color: var(--accent);
 }
 
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .text-button {
   padding: 0.4rem 0;
   border: 0;
@@ -139,6 +154,12 @@ select {
   border: 1px solid #d9a4a0;
   background: #fff3f2;
   color: #8f2018;
+}
+
+.form-message.success {
+  border: 1px solid #8bc7b8;
+  background: #effbf7;
+  color: #075f50;
 }
 
 .role-fieldset {
@@ -199,9 +220,11 @@ select {
 }
 
 .brand {
+  color: var(--ink);
   font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.04em;
+  text-decoration: none;
 }
 
 .topbar-label {
@@ -217,6 +240,95 @@ select {
   border: 1px solid var(--line);
   border-radius: 1.25rem;
   background: var(--surface);
+}
+
+.empty-state h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.workspace-content {
+  display: grid;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: clamp(2rem, 7vw, 5rem) 0;
+  gap: 2rem;
+}
+
+.project-list-heading,
+.project-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.project-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.project-list a:hover {
+  border-color: var(--accent);
+}
+
+.project-list span:first-child {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.project-list small {
+  color: var(--muted);
+}
+
+.project-form {
+  display: grid;
+  gap: 1.25rem;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  background: var(--surface);
+}
+
+.back-link {
+  width: fit-content;
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.status-pill {
+  padding: 0.4rem 0.65rem;
+  border-radius: 999px;
+  background: rgb(0 107 95 / 10%);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 40rem) {
+  .project-list-heading,
+  .project-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 @media (min-width: 48rem) {

@@ -1,0 +1,108 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { createClient } from "@supabase/supabase-js";
+import { expect, test, type Page } from "@playwright/test";
+import { parse } from "dotenv";
+import postgres from "postgres";
+
+const root = resolve(process.cwd());
+const tools = parse(readFileSync(resolve(root, ".env.tools.local"), "utf8"));
+const app = parse(readFileSync(resolve(root, ".env.local"), "utf8"));
+if (!tools.DEMO_USER_PASSWORD || !tools.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("Run pnpm db:prepare and pnpm demo:seed before the project E2E tests.");
+}
+
+const authAdmin = createClient(app.NEXT_PUBLIC_SUPABASE_URL, tools.SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+const adminSql = postgres(tools.SUPABASE_DB_ADMIN_URL, { max: 1, prepare: false });
+let demoUserIds: string[] = [];
+
+async function login(page: Page, email: string) {
+  await page.goto("/sign-in");
+  await page.getByLabel("邮箱").fill(email);
+  await page.getByLabel("密码").fill(tools.DEMO_USER_PASSWORD);
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page).not.toHaveURL(/\/sign-in$/);
+}
+
+test.beforeAll(async () => {
+  const { data, error } = await authAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) throw error;
+  const emails = new Set([
+    "enterprise-a@qianzo.local",
+    "enterprise-b@qianzo.local",
+    "builder@qianzo.local",
+  ]);
+  demoUserIds = data.users.filter((user) => user.email && emails.has(user.email)).map((user) => user.id);
+  if (demoUserIds.length !== 3) throw new Error("Run pnpm demo:seed before the project E2E tests.");
+  await adminSql`delete from app.projects where owner_id in ${adminSql(demoUserIds)}`;
+});
+
+test.afterAll(async () => {
+  if (demoUserIds.length) {
+    await adminSql`delete from app.projects where owner_id in ${adminSql(demoUserIds)}`;
+  }
+  await adminSql.end();
+});
+
+test("a draft persists while other enterprises and Builders remain isolated", async ({ browser, page }) => {
+  test.setTimeout(60_000);
+  await login(page, "enterprise-a@qianzo.local");
+  await expect(page).toHaveURL(/\/enterprise\/projects$/);
+  await page.getByRole("link", { name: "创建项目" }).click();
+  await page.getByLabel("项目标题").fill("E2E 原始项目");
+  await page.getByLabel("原始需求").fill("需要一个可持久化且隔离的草稿。");
+  await page.getByRole("button", { name: "创建草稿" }).click();
+
+  await expect(page).toHaveURL(/\/enterprise\/projects\/[0-9a-f-]{36}$/, { timeout: 15_000 });
+  const projectUrl = new URL(page.url());
+  const projectPath = projectUrl.pathname;
+  await expect(page.getByRole("heading", { name: "E2E 原始项目" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("项目标题")).toHaveValue("E2E 原始项目");
+
+  const staleEditor = await page.context().newPage();
+  await staleEditor.goto(projectPath);
+  await expect(staleEditor.getByText("草稿 · 版本 1")).toBeVisible();
+
+  await page.getByLabel("项目标题").fill("窗口一保存成功");
+  await page.getByLabel("原始需求").fill("第一个编辑窗口的内容必须保留。");
+  await page.getByRole("button", { name: "保存草稿" }).click();
+  await expect(page).toHaveURL(new RegExp(`${projectPath.replaceAll("/", "\\/")}\\?saved=1$`));
+  await expect(page.getByText("草稿已保存。")).toBeVisible();
+  await expect(page.getByText("草稿 · 版本 2")).toBeVisible();
+
+  await staleEditor.getByLabel("项目标题").fill("窗口二不应覆盖");
+  await staleEditor.getByRole("button", { name: "保存草稿" }).click();
+  await expect(staleEditor.locator('[data-error-code="VERSION_CONFLICT"]')).toContainText(
+    "项目已被更新",
+  );
+  await page.reload();
+  await expect(page.getByLabel("项目标题")).toHaveValue("窗口一保存成功");
+
+  const enterpriseBContext = await browser.newContext({ baseURL: "http://127.0.0.1:3000" });
+  const enterpriseBPage = await enterpriseBContext.newPage();
+  await login(enterpriseBPage, "enterprise-b@qianzo.local");
+  await expect(enterpriseBPage.getByText("窗口一保存成功")).toHaveCount(0);
+  const forbiddenResponse = await enterpriseBPage.goto(projectPath);
+  expect(forbiddenResponse?.status()).toBe(404);
+  await enterpriseBPage.waitForLoadState("networkidle");
+  await enterpriseBContext.close();
+
+  const builderContext = await browser.newContext({ baseURL: "http://127.0.0.1:3000" });
+  const builderPage = await builderContext.newPage();
+  await login(builderPage, "builder@qianzo.local");
+  await builderPage.goto("/enterprise/projects/new");
+  await expect(builderPage).toHaveURL(/\/$/);
+  await expect(builderPage.getByRole("heading", { name: "已登录" })).toBeVisible();
+  await builderContext.close();
+
+  await page.getByRole("button", { name: "退出登录" }).click();
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await login(page, "enterprise-a@qianzo.local");
+  await page.goto(projectPath);
+  await expect(page.getByLabel("项目标题")).toHaveValue("窗口一保存成功");
+  await expect(page.getByText("草稿 · 版本 2")).toBeVisible();
+});
