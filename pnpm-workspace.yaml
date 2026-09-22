@@ -1,2 +1,8 @@
 allowBuilds:
   unrs-resolver: true
+fetchTimeout: 600000
+fetchRetries: 5
+networkConcurrency: 4
+minimumReleaseAgeExclude:
+  - dotenv@18.0.2
+  - drizzle-orm@0.45.3
