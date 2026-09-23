@@ -1,8 +1,8 @@
 # Qianzo 项目状态
 
-更新时间：2026-09-23（S0 完成于 2026-09-22，2026-09-23 由独立会话复验并整理文档位置）
+更新时间：2026-09-23（S0 完成于 2026-09-22；2026-09-23 由独立会话复验、整理文档位置并推送远端）
 
-当前分支：`feat/s0-project-draft`
+当前分支：`feat/s0-project-draft`（已推送，PR #1 待合入 `main`）
 
 当前 Slice：S0 已完成本地实现与验收；S1 尚未开始。
 
@@ -54,15 +54,25 @@
 - `9178132 feat(db): add S0 foundation tables with restricted runtime access`
 - `76aa611 feat(identity): add authenticated onboarding and local demo users`
 - `652a10a feat(projects): create and edit drafts scoped to the owner`
-- S0-05 验收与文档位于包含本文件的 `test(s0)` 提交。
+- S0-05 验收与文档位于 `16aa688 test(s0): verify project draft isolation and document handoff`。
+- `0144cc9 docs: collect authoritative documents under docs/`
+- `43a799d chore: ignore the local agent workspace directory`
+- `437687a chore: keep the TypeScript incremental cache out of the repository root`
+- `acbd2e8 docs: make the README runnable on this machine`
+- `8a55e9f chore(s0): join the initial empty main into the S0 branch`
 
 ## 环境与远端
 
 - Node.js 24.13.1，pnpm 11.19.0。
 - Docker Desktop 4.91.0 / Engine 29.8.0；程序和数据安装在 D 盘。
 - Supabase CLI 2.117.0；Playwright 1.63.0 / Chromium 153 安装在 D 盘。
-- `origin` 为 `https://github.com/xuyuufan/QianZo.git`；开工时已核验远端无 refs。
-- 当前提交仅在本地，尚未 push、创建 PR 或 merge。
+- `origin` 为 `https://github.com/xuyuufan/QianZo.git`；开工时远端无 refs，2026-09-23 经 `gh api` 复核仍为空仓库（`size: 0`、无分支）。
+- 2026-09-23 建立 `main`：一个空树根提交 `168b4ee chore: initialize the repository`，作为本 Slice 的 PR 基准分支。
+  S0 分支原本是另一条独立根历史，因此以 `--allow-unrelated-histories` 把 `main` 接入 S0 分支
+  （`8a55e9f`），建立共同祖先；未改写任何既有提交，也未经由强制推送。
+- 已推送：`origin/main`（`168b4ee`）与 `origin/feat/s0-project-draft`（`8a55e9f`）。
+- 已创建 PR：<https://github.com/xuyuufan/QianZo/pull/1>（base `main` ← head `feat/s0-project-draft`）。
+  按开发流程，本 Slice 建议以 squash merge 合入 `main`；**当前尚未 merge**。
 
 ## 已知限制与交接
 
