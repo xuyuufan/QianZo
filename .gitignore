@@ -19,6 +19,9 @@ test-results/
 supabase/.branches/
 supabase/.temp/
 
+# Local agent workspace state (session memory and per-machine notes)
+.workbuddy/
+
 # Editors and operating systems
 .idea/
 .vscode/
