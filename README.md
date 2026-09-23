@@ -1,6 +1,6 @@
 # Qianzo
 
-Qianzo 当前完成了 S0：企业通过真实 Supabase Auth 登录后，可以创建、查看和编辑自己的持久化项目草稿。企业间资源隔离、Builder 拒绝、重复创建和旧版本保存冲突均在服务端及真实 PostgreSQL 上验证。S1 尚未开始。
+Qianzo 当前完成了 S0：企业通过真实 Supabase Auth 登录后，可以创建、查看和编辑自己的持久化项目草稿。企业间资源隔离、Builder 拒绝、重复创建和旧版本保存冲突均在服务端及真实 PostgreSQL 上验证。[S1 施工规划](docs/slices/S1-spec-publish/README.md)已完成，业务实现尚未开始。
 
 ## 本机要求
 
@@ -131,4 +131,5 @@ corepack pnpm demo:seed
 - [开发与 Git 工作流程](docs/DEVELOPMENT_WORKFLOW.md)
 - [施工切片](docs/BUILD_SLICES.md)
 - [S0 施工规格](docs/slices/S0-project-draft/README.md)
+- [S1 施工规划：需求变成可招募项目](docs/slices/S1-spec-publish/README.md)
 - [当前项目状态](docs/PROJECT_STATUS.md)
