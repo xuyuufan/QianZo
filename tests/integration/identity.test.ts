@@ -1,12 +1,16 @@
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { parse } from "dotenv";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import {
+  loadLocalEnv,
+  requireLoopbackApiUrl,
+  requireLoopbackDatabaseUrl,
+} from "../helpers/local-env";
 
 import {
   completeOnboardingWithDatabase,
@@ -40,17 +44,25 @@ async function ensureAuthUser(email: string, metadata: Record<string, unknown> =
 }
 
 beforeAll(async () => {
-  const root = resolve(import.meta.dirname, "../..");
-  const tools = parse(readFileSync(resolve(root, ".env.tools.local"), "utf8"));
-  const app = parse(readFileSync(resolve(root, ".env.local"), "utf8"));
+  const { tools, app } = loadLocalEnv(resolve(import.meta.dirname, "../.."));
   if (!tools.DEMO_USER_PASSWORD) throw new Error("DEMO_USER_PASSWORD is required.");
   testPassword = tools.DEMO_USER_PASSWORD;
-  admin = postgres(tools.SUPABASE_DB_ADMIN_URL, { max: 1, prepare: false });
-  runtime = postgres(app.DATABASE_URL, { max: 1, prepare: false });
-  database = drizzle(runtime, { schema });
-  authAdmin = createClient(app.NEXT_PUBLIC_SUPABASE_URL, tools.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
+  admin = postgres(requireLoopbackDatabaseUrl(tools.SUPABASE_DB_ADMIN_URL, "SUPABASE_DB_ADMIN_URL"), {
+    max: 1,
+    prepare: false,
   });
+  runtime = postgres(requireLoopbackDatabaseUrl(app.DATABASE_URL, "DATABASE_URL"), {
+    max: 1,
+    prepare: false,
+  });
+  database = drizzle(runtime, { schema });
+  authAdmin = createClient(
+    requireLoopbackApiUrl(app.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL"),
+    tools.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    },
+  );
   enterpriseId = await ensureAuthUser("identity-enterprise@qianzo.test");
   metadataOnlyId = await ensureAuthUser("identity-metadata@qianzo.test", { role: "ADMIN" });
   await admin`delete from app.user_roles where user_id in (${enterpriseId}, ${metadataOnlyId})`;

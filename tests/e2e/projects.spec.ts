@@ -1,22 +1,29 @@
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type Page } from "@playwright/test";
-import { parse } from "dotenv";
 import postgres from "postgres";
 
-const root = resolve(process.cwd());
-const tools = parse(readFileSync(resolve(root, ".env.tools.local"), "utf8"));
-const app = parse(readFileSync(resolve(root, ".env.local"), "utf8"));
+import {
+  loadLocalEnv,
+  requireLoopbackApiUrl,
+  requireLoopbackDatabaseUrl,
+} from "../helpers/local-env";
+
+const { tools, app } = loadLocalEnv(resolve(process.cwd()));
 if (!tools.DEMO_USER_PASSWORD || !tools.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Run pnpm db:prepare and pnpm demo:seed before the project E2E tests.");
 }
 
-const authAdmin = createClient(app.NEXT_PUBLIC_SUPABASE_URL, tools.SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
+const authAdmin = createClient(
+  requireLoopbackApiUrl(app.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL"),
+  tools.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } },
+);
+const adminSql = postgres(requireLoopbackDatabaseUrl(tools.SUPABASE_DB_ADMIN_URL, "SUPABASE_DB_ADMIN_URL"), {
+  max: 1,
+  prepare: false,
 });
-const adminSql = postgres(tools.SUPABASE_DB_ADMIN_URL, { max: 1, prepare: false });
 let demoUserIds: string[] = [];
 
 async function login(page: Page, email: string) {
