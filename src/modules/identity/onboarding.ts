@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Database } from "@/platform/db/client";
@@ -70,14 +70,15 @@ export async function completeOnboardingWithDatabase(
   const input = onboardingInputSchema.parse(rawInput);
 
   await database.transaction(async (transaction) => {
-    await transaction
-      .insert(users)
-      .values({ id: userId, displayName: input.displayName })
-      .onConflictDoUpdate({
-        target: users.id,
-        set: { displayName: input.displayName, updatedAt: new Date() },
-        where: eq(users.status, "ACTIVE"),
-      });
+    // Column-scoped INSERT keeps the runtime role from setting status or
+    // timestamps; Drizzle would list every table column here.
+    await transaction.execute(sql`
+      insert into app.users (id, display_name)
+      values (${userId}, ${input.displayName})
+      on conflict (id) do update
+        set display_name = excluded.display_name, updated_at = now()
+        where app.users.status = 'ACTIVE'
+    `);
 
     const [profile] = await transaction
       .select({ status: users.status })
@@ -89,10 +90,14 @@ export async function completeOnboardingWithDatabase(
       throw new IdentityError("ACTOR_DISABLED", "This account is disabled.");
     }
 
-    await transaction
-      .insert(userRoles)
-      .values(input.roles.map((role) => ({ userId, role })))
-      .onConflictDoNothing();
+    await transaction.execute(sql`
+      insert into app.user_roles (user_id, role)
+      values ${sql.join(
+        input.roles.map((role) => sql`(${userId}, ${role})`),
+        sql`, `,
+      )}
+      on conflict do nothing
+    `);
   });
 
   const actor = await getActorByIdWithDatabase(database, userId);

@@ -1,9 +1,13 @@
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { parse } from "dotenv";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import {
+  loadLocalEnv,
+  requireLoopbackApiUrl,
+  requireLoopbackDatabaseUrl,
+} from "../helpers/local-env";
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -12,21 +16,8 @@ let runtime: Sql;
 let apiUrl: string;
 let anonKey: string;
 
-function requireLoopbackDatabaseUrl(value: string | undefined, name: string) {
-  if (!value) {
-    throw new Error(`${name} is required. Run pnpm db:prepare first.`);
-  }
-  const url = new URL(value);
-  if (url.protocol !== "postgresql:" || !["127.0.0.1", "localhost", "::1"].includes(url.hostname)) {
-    throw new Error(`${name} must use loopback PostgreSQL.`);
-  }
-  return url.toString();
-}
-
 beforeAll(() => {
-  const root = resolve(import.meta.dirname, "../..");
-  const tools = parse(readFileSync(resolve(root, ".env.tools.local"), "utf8"));
-  const app = parse(readFileSync(resolve(root, ".env.local"), "utf8"));
+  const { tools, app } = loadLocalEnv(resolve(import.meta.dirname, "../.."));
   admin = postgres(requireLoopbackDatabaseUrl(tools.SUPABASE_DB_ADMIN_URL, "SUPABASE_DB_ADMIN_URL"), {
     max: 1,
     prepare: false,
@@ -35,7 +26,7 @@ beforeAll(() => {
     max: 1,
     prepare: false,
   });
-  apiUrl = app.NEXT_PUBLIC_SUPABASE_URL;
+  apiUrl = requireLoopbackApiUrl(app.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL");
   anonKey = app.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 });
 
@@ -70,6 +61,31 @@ describe("S0 database boundary", () => {
     ["change project status", "update app.projects set status = 'OPEN'"],
     ["change user status", "update app.users set status = 'DISABLED'"],
     ["elevate roles", "alter role qianzo_runtime superuser"],
+  ])("does not let runtime %s", async (_label, statement) => {
+    await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
+  });
+
+  it.each([
+    [
+      "insert a user with a chosen status",
+      "insert into app.users (id, display_name, status) values (gen_random_uuid(), '越权', 'DISABLED')",
+    ],
+    [
+      "insert a user with chosen timestamps",
+      "insert into app.users (id, display_name, created_at) values (gen_random_uuid(), '越权', now())",
+    ],
+    [
+      "insert a project with a chosen status",
+      "insert into app.projects (id, owner_id, title, original_requirement, status) values (gen_random_uuid(), gen_random_uuid(), '越权', '', 'OPEN')",
+    ],
+    [
+      "insert a project with a chosen version",
+      "insert into app.projects (id, owner_id, title, original_requirement, version) values (gen_random_uuid(), gen_random_uuid(), '越权', '', 99)",
+    ],
+    [
+      "insert a role with a chosen timestamp",
+      "insert into app.user_roles (user_id, role, created_at) values (gen_random_uuid(), 'ENTERPRISE', now())",
+    ],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
   });

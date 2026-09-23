@@ -1,5 +1,4 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-
 import type { Actor } from "@/modules/identity/onboarding";
 import { IdentityError } from "@/modules/identity/onboarding";
 import type { Database } from "@/platform/db/client";
@@ -58,6 +57,30 @@ export async function getOwnProjectWithDatabase(
   return project ?? null;
 }
 
+type ProjectRow = {
+  id: string;
+  owner_id: string;
+  title: string;
+  original_requirement: string;
+  status: string;
+  version: number;
+  created_at: Date;
+  updated_at: Date;
+};
+
+function toProject(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    title: row.title,
+    originalRequirement: row.original_requirement,
+    status: row.status,
+    version: row.version,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export async function createProjectWithDatabase(
   database: Database,
   actor: Actor,
@@ -67,18 +90,18 @@ export async function createProjectWithDatabase(
   const input: CreateProjectInput = createProjectInputSchema.parse(rawInput);
 
   return database.transaction(async (transaction) => {
-    const [created] = await transaction
-      .insert(projects)
-      .values({
-        id: input.projectId,
-        ownerId: actor.id,
-        title: input.title,
-        originalRequirement: input.originalRequirement,
-      })
-      .onConflictDoNothing()
-      .returning();
-
-    if (created) return created;
+    // Column-scoped INSERT keeps the runtime role from setting status, version,
+    // or timestamps; Drizzle would list every table column here.
+    const inserted = await transaction.execute<ProjectRow>(sql`
+      insert into app.projects (id, owner_id, title, original_requirement)
+      values (${input.projectId}, ${actor.id}, ${input.title}, ${input.originalRequirement})
+      on conflict do nothing
+      returning id, owner_id, title, original_requirement, status, version, created_at, updated_at
+    `);
+    const created = inserted[0];
+    if (created) {
+      return toProject(created);
+    }
 
     const [existing] = await transaction
       .select()
