@@ -14,9 +14,6 @@ export default async function OnboardingPage() {
     redirect("/sign-in");
   }
   const actor = await getActorById(userId);
-  if (actor?.status === "ACTIVE") {
-    redirect("/");
-  }
 
   if (actor?.status === "DISABLED") {
     return (
@@ -34,11 +31,11 @@ export default async function OnboardingPage() {
     <main className="auth-shell">
       <section className="auth-card" aria-labelledby="onboarding-title">
         <div>
-          <p className="eyebrow">首次设置</p>
+          <p className="eyebrow">{actor ? "身份设置" : "首次设置"}</p>
           <h1 id="onboarding-title" className="section-title">选择你的参与方式</h1>
           <p className="lede">身份可同时选择；以后增加身份不会移除已有身份。</p>
         </div>
-        <OnboardingForm />
+        <OnboardingForm defaultDisplayName={actor?.displayName} defaultRoles={actor?.roles} />
         <form action={signOutAction}><button className="text-button">退出登录</button></form>
       </section>
     </main>

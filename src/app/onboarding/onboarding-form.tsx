@@ -15,22 +15,45 @@ function SubmitButton() {
   );
 }
 
-export function OnboardingForm() {
+export function OnboardingForm({
+  defaultDisplayName = "",
+  defaultRoles = [],
+}: {
+  defaultDisplayName?: string;
+  defaultRoles?: readonly ("ENTERPRISE" | "BUILDER")[];
+}) {
   const [state, action] = useActionState(completeOnboardingAction, emptyFormActionState);
   return (
     <form action={action} className="form-stack">
       <label className="field">
         <span>显示名</span>
-        <input name="displayName" type="text" minLength={1} maxLength={80} required />
+        <input
+          name="displayName"
+          type="text"
+          minLength={1}
+          maxLength={80}
+          required
+          defaultValue={defaultDisplayName}
+        />
       </label>
       <fieldset className="role-fieldset">
         <legend>参与身份</legend>
         <label className="choice-card">
-          <input name="roles" type="checkbox" value="ENTERPRISE" />
+          <input
+            name="roles"
+            type="checkbox"
+            value="ENTERPRISE"
+            defaultChecked={defaultRoles.includes("ENTERPRISE")}
+          />
           <span><strong>企业</strong><small>创建和管理项目草稿</small></span>
         </label>
         <label className="choice-card">
-          <input name="roles" type="checkbox" value="BUILDER" />
+          <input
+            name="roles"
+            type="checkbox"
+            value="BUILDER"
+            defaultChecked={defaultRoles.includes("BUILDER")}
+          />
           <span><strong>Builder</strong><small>后续切片开放接单</small></span>
         </label>
       </fieldset>

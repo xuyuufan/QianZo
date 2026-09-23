@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { signOutAction } from "@/app/actions/auth";
@@ -21,6 +22,7 @@ export default async function HomePage() {
         <p className="eyebrow">Builder</p>
         <h1 id="page-title" className="section-title">已登录</h1>
         <p className="lede">接单功能将在后续切片开放。</p>
+        <p><Link className="text-button" href="/onboarding">增加企业身份</Link></p>
         <form action={signOutAction}><button className="button secondary">退出登录</button></form>
       </section>
     </main>

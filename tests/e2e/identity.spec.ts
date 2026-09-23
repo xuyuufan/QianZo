@@ -1,43 +1,56 @@
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
-import { parse } from "dotenv";
 import postgres from "postgres";
 
-const root = resolve(process.cwd());
-const tools = parse(readFileSync(resolve(root, ".env.tools.local"), "utf8"));
-const app = parse(readFileSync(resolve(root, ".env.local"), "utf8"));
+import {
+  loadLocalEnv,
+  requireLoopbackApiUrl,
+  requireLoopbackDatabaseUrl,
+} from "../helpers/local-env";
+
+const { tools, app } = loadLocalEnv(resolve(process.cwd()));
 
 if (!tools.DEMO_USER_PASSWORD || !tools.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Run pnpm db:prepare before the identity E2E tests.");
 }
 
 const adminClient = createClient(
-  app.NEXT_PUBLIC_SUPABASE_URL,
+  requireLoopbackApiUrl(app.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL"),
   tools.SUPABASE_SERVICE_ROLE_KEY,
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
-const adminSql = postgres(tools.SUPABASE_DB_ADMIN_URL, { max: 1, prepare: false });
+const adminSql = postgres(requireLoopbackDatabaseUrl(tools.SUPABASE_DB_ADMIN_URL, "SUPABASE_DB_ADMIN_URL"), {
+  max: 1,
+  prepare: false,
+});
 const firstTimeEmail = `onboarding-${Date.now()}@qianzo.test`;
+const repeatEmail = `repeat-onboarding-${Date.now()}@qianzo.test`;
 let firstTimeUserId: string;
+let repeatUserId: string;
 
-test.beforeAll(async () => {
+async function createAuthUser(email: string) {
   const { data, error } = await adminClient.auth.admin.createUser({
-    email: firstTimeEmail,
+    email,
     password: tools.DEMO_USER_PASSWORD,
     email_confirm: true,
   });
   if (error) throw error;
-  firstTimeUserId = data.user.id;
+  return data.user.id;
+}
+
+test.beforeAll(async () => {
+  firstTimeUserId = await createAuthUser(firstTimeEmail);
+  repeatUserId = await createAuthUser(repeatEmail);
 });
 
 test.afterAll(async () => {
-  if (firstTimeUserId) {
-    await adminSql`delete from app.user_roles where user_id = ${firstTimeUserId}`;
-    await adminSql`delete from app.users where id = ${firstTimeUserId}`;
-    const { error } = await adminClient.auth.admin.deleteUser(firstTimeUserId);
+  for (const userId of [firstTimeUserId, repeatUserId]) {
+    if (!userId) continue;
+    await adminSql`delete from app.user_roles where user_id = ${userId}`;
+    await adminSql`delete from app.users where id = ${userId}`;
+    const { error } = await adminClient.auth.admin.deleteUser(userId);
     if (error) throw error;
   }
   await adminSql.end();
@@ -75,4 +88,29 @@ test("a first-time Auth user completes onboarding through the real UI", async ({
 
   await expect(page).toHaveURL(/\/enterprise\/projects$/);
   await expect(page.getByText("你好，首次接入企业")).toBeVisible();
+});
+
+test("an onboarded user returns to onboarding to add the ENTERPRISE role", async ({ page }) => {
+  await page.goto("/sign-in");
+  await page.getByLabel("邮箱").fill(repeatEmail);
+  await page.getByLabel("密码").fill(tools.DEMO_USER_PASSWORD);
+  await page.getByRole("button", { name: "登录" }).click();
+
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByLabel("显示名").fill("再次设置用户");
+  await page.getByRole("checkbox", { name: /Builder/ }).check();
+  await page.getByRole("button", { name: "完成设置" }).click();
+
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole("link", { name: "增加企业身份" }).click();
+
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page.getByLabel("显示名")).toHaveValue("再次设置用户");
+  await expect(page.getByRole("checkbox", { name: /Builder/ })).toBeChecked();
+  await expect(page.getByText("身份设置")).toBeVisible();
+  await page.getByRole("checkbox", { name: /企业/ }).check();
+  await page.getByRole("button", { name: "完成设置" }).click();
+
+  await expect(page).toHaveURL(/\/enterprise\/projects$/);
+  await expect(page.getByText("你好，再次设置用户")).toBeVisible();
 });
