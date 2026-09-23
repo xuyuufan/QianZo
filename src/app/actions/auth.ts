@@ -4,7 +4,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { completeOnboarding } from "@/modules/identity/service";
-import { requireAuth, createSupabaseServerClient } from "@/platform/auth/server";
+import {
+  AuthenticationError,
+  requireAuth,
+  createSupabaseServerClient,
+} from "@/platform/auth/server";
 
 import type { FormActionState } from "./form-state";
 
@@ -44,8 +48,8 @@ export async function completeOnboardingAction(
   _previous: FormActionState,
   formData: FormData,
 ): Promise<FormActionState> {
-  const userId = await requireAuth();
   try {
+    const userId = await requireAuth();
     await completeOnboarding(userId, {
       displayName: formData.get("displayName"),
       roles: formData.getAll("roles"),
@@ -53,6 +57,9 @@ export async function completeOnboardingAction(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { errorCode: "VALIDATION_ERROR", message: "请填写显示名并至少选择一个身份。" };
+    }
+    if (error instanceof AuthenticationError) {
+      return { errorCode: "AUTHENTICATION_REQUIRED", message: "请重新登录后再操作。" };
     }
     return { errorCode: "ONBOARDING_FAILED", message: "暂时无法保存，请稍后再试。" };
   }
