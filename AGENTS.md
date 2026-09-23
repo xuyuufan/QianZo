@@ -2,11 +2,11 @@
 
 ## 阅读顺序
 
-1. [工程总纲 V0.2](QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md)
-2. [开发与 Git 工作流程](DEVELOPMENT_WORKFLOW.md)
-3. [S0～S3 施工切片](BUILD_SLICES.md)
-4. 当前 Slice README；首项为 [S0：真实登录与自己的项目](slices/S0-project-draft/README.md)
-5. 当前任务及已存在的项目状态、相关代码和测试
+1. [工程总纲 V0.2](docs/QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md)
+2. [开发与 Git 工作流程](docs/DEVELOPMENT_WORKFLOW.md)
+3. [S0～S3 施工切片](docs/BUILD_SLICES.md)
+4. 当前 Slice README；首项为 [S0：真实登录与自己的项目](docs/slices/S0-project-draft/README.md)
+5. 当前任务及已存在的项目状态、相关代码和测试；当前状态见 [PROJECT_STATUS](docs/PROJECT_STATUS.md)
 
 远端仓库：`https://github.com/xuyuufan/QianZo.git`。
 
@@ -41,7 +41,7 @@
 ## 文档维护
 
 - Blueprint 负责范围与架构；Workflow 负责开发与提交；Slices 负责施工顺序。
-- 当前文件位置是实际入口。未来移动到 docs 时，同步修正链接，避免两个并列权威版本。
+- 根目录只保留 README 与本文件作为入口；其余权威文档集中在 `docs/`，切片说明在 `docs/slices/`。移动或重命名时必须同步修正本文件、README 和文档内部链接，避免两个并列权威版本。
 - 架构和产品规则变动时更新对应权威文档，不能只改代码或依靠聊天记录解释。
 - 应用脚本已经建立；启动、构建和测试命令以根 README 和 `package.json` 的当前实现为准，不虚构未运行的检查。
 

@@ -11,7 +11,7 @@
 
 **第一阶段的完成标准：用真实登录、真实数据库和真实权限检查，在本地通过 Mock AIPM、Mock Payment 完成一个合成项目的交付闭环。**
 
-本文是本轮工程总纲；施工切片见 [BUILD_SLICES.md](BUILD_SLICES.md)，开发、commit、push 与合并规则见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md)，Codex 入口见 [AGENTS.md](AGENTS.md)。附录 A 补全了沿用的 SpecDocumentV1，后续开发无需依赖聊天记录取得该结构。
+本文是本轮工程总纲；施工切片见 [BUILD_SLICES.md](BUILD_SLICES.md)，开发、commit、push 与合并规则见 [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md)，Codex 入口见 [AGENTS.md](../AGENTS.md)。附录 A 补全了沿用的 SpecDocumentV1，后续开发无需依赖聊天记录取得该结构。
 
 ## 实施等级
 
@@ -589,51 +589,52 @@ Supabase 作为当前开发用数据库和认证服务保留；**应用部署供
 
 先创建少量权威文档，避免同一规则散落在十几份文件中。
 
-当前已落盘的工程入口保留在根目录，可以直接使用；首项施工说明见 [S0 README](slices/S0-project-draft/README.md)。不为了开始 S0 强制移动现有文档。
-
-```text
-D:\Qianzo\
-├── AGENTS.md
-├── QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md
-├── DEVELOPMENT_WORKFLOW.md
-├── BUILD_SLICES.md
-└── slices\
-    └── S0-project-draft\
-        └── README.md
-```
-
-后续应用施工时按实际需要逐步补充文档，或集中到以下目标结构；迁移时保留一个权威来源并更新链接：
+当前实际落盘结构如下：根目录只保留 README 与 AGENTS 两个入口，工程总纲、Workflow、施工切片、状态和切片施工说明集中在 `docs/`。首项施工说明见 [S0 README](slices/S0-project-draft/README.md)。
 
 ```text
 D:\Qianzo\
 ├── README.md
 ├── AGENTS.md
-├── DEVELOPMENT_WORKFLOW.md
-├── BUILD_SLICES.md
-├── slices\
-│   └── S0-project-draft\README.md
-└── docs\
-    ├── ENGINEERING_BLUEPRINT.md
-    ├── PRODUCT_DECISIONS.md
-    ├── AIPM_CONTRACT.md
-    ├── BUILD_QUEUE.md
-    └── PROJECT_STATUS.md
+├── docs\
+│   ├── QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md
+│   ├── DEVELOPMENT_WORKFLOW.md
+│   ├── BUILD_SLICES.md
+│   ├── PROJECT_STATUS.md
+│   └── slices\
+│       └── S0-project-draft\
+│           └── README.md
+├── src\  tests\  scripts\  supabase\
+└── 工程配置（package.json、tsconfig、eslint、next、playwright、vitest）
 ```
 
-以上是 **`V0 REQUIRED`** 能力按需形成的目标文档结构，并非要求 IBQ-01 一次性创建所有文件。当前总纲在根目录即可作为权威来源；如以后移入 docs，更新全部入口链接，不长期维护两份并列权威副本。BUILD_QUEUE 细化任务并引用已有切片说明，不重复维护另一套冲突的实施顺序。
+后续按能力继续补充到同一 `docs/` 下，迁移时保留一个权威来源并更新链接：
+
+```text
+docs\
+├── QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md
+├── DEVELOPMENT_WORKFLOW.md
+├── BUILD_SLICES.md
+├── PROJECT_STATUS.md
+├── PRODUCT_DECISIONS.md      [按需]
+├── AIPM_CONTRACT.md          [按需]
+├── BUILD_QUEUE.md            [按需]
+└── slices\S1-…\README.md     [进入 S1 时]
+```
+
+以上是 **`V0 REQUIRED`** 能力按需形成的目标文档结构，并非要求一次性创建所有文件。每次搬迁都必须更新入口链接，不长期维护两份并列权威副本。BUILD_QUEUE 细化任务并引用已有切片说明，不重复维护另一套冲突的实施顺序。
 
 | 文档 | 内容 |
 |---|---|
 | README.md | 如何安装、启动、测试和运行本地演示 |
 | AGENTS.md | 关键不变量、权限边界、命令、阅读顺序和当前禁止扩大的范围 |
-| DEVELOPMENT_WORKFLOW.md | 分支、任务验收、commit 时点、消息格式、push/PR/merge 与交付规范 |
-| BUILD_SLICES.md | S0～S3 的边界、依赖及分阶段验收 |
-| slices/S0-project-draft/README.md | 首项可直接交给 Codex 执行的详细任务说明 |
-| ENGINEERING_BLUEPRINT.md | 本版架构、实施等级、当前数据库、状态机和最小支付规则 |
-| PRODUCT_DECISIONS.md | Pending、已决事项、演示约定及其适用范围 |
-| AIPM_CONTRACT.md | 当前必需协议、示例；后续字段单列，不混入 required |
-| BUILD_QUEUE.md | 10 项即时队列、当前任务的小拆分、后续 backlog |
-| PROJECT_STATUS.md | 已实现能力、验证结果、未实现部分、下一项工作 |
+| docs/DEVELOPMENT_WORKFLOW.md | 分支、任务验收、commit 时点、消息格式、push/PR/merge 与交付规范 |
+| docs/BUILD_SLICES.md | S0～S3 的边界、依赖及分阶段验收 |
+| docs/slices/S0-project-draft/README.md | 首项可直接交给 Codex 执行的详细任务说明 |
+| docs/QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md | 本版架构、实施等级、当前数据库、状态机和最小支付规则 |
+| docs/PRODUCT_DECISIONS.md | Pending、已决事项、演示约定及其适用范围 |
+| docs/AIPM_CONTRACT.md | 当前必需协议、示例；后续字段单列，不混入 required |
+| docs/BUILD_QUEUE.md | 10 项即时队列、当前任务的小拆分、后续 backlog |
+| docs/PROJECT_STATUS.md | 已实现能力、验证结果、未实现部分、下一项工作 |
 
 暂不独立创建：
 

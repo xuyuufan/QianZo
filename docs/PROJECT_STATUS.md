@@ -1,10 +1,12 @@
 # Qianzo 项目状态
 
-更新时间：2026-09-22
+更新时间：2026-09-23（S0 完成于 2026-09-22，2026-09-23 由独立会话复验并整理文档位置）
 
 当前分支：`feat/s0-project-draft`
 
 当前 Slice：S0 已完成本地实现与验收；S1 尚未开始。
+
+权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
 
 ## 已完成
 
@@ -30,6 +32,21 @@
 - `pnpm test:e2e`：3 个真实浏览器用例通过，覆盖登录/刷新/退出、首次 onboarding、持久化草稿、双企业隔离、Builder 拒绝和旧版本冲突。
 - `pnpm build`：通过；包含 `/sign-in`、`/onboarding`、项目列表、新建和动态详情路由。
 - `pnpm start`：生产构建成功启动；未登录请求 `/enterprise/projects` 返回 307 并指向 `/sign-in`。
+
+## 独立复验（2026-09-23）
+
+由第二个执行者（非 S0 原实现方）在 Windows 本机、Node.js 24.13.1 / pnpm 11.19.0 上重新实际执行，不采信上一轮自述：
+
+- `pnpm typecheck`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过；当前没有独立单元测试文件（`--passWithNoTests`）。
+- `pnpm test:integration`：3 个文件、23 个用例通过，与上一轮记录一致。
+- `pnpm build`：通过；生成 `/`、`/_not-found`、`/enterprise/projects`、`/enterprise/projects/[projectId]`、`/enterprise/projects/new`、`/onboarding`、`/sign-in` 共 7 条路由。
+- `pnpm test:e2e`：3 个真实浏览器用例通过（34.1s），覆盖真实登录/刷新/退出、首次 onboarding、草稿持久化、双企业隔离、Builder 拒绝和旧版本冲突。
+- `pnpm start`：本轮未重复执行；上一轮记录保持不变。
+- 注意：`pnpm build` 与 `pnpm test:e2e` 会重建 `.next/` 与 `test-results/`；在带批量删除保护的环境中需要显式授权，这不影响项目本身的可构建性。
+
+代码与边界独立复核结论：服务端入口逐个校验身份与资源归属，`app` schema 不对 Data API 暴露，`qianzo_runtime` 无建表/删除/改 owner 与提权能力，编辑走行锁加 `expectedVersion` 乐观并发；未发现与文档不符的实现。
 
 ## 本地提交
 

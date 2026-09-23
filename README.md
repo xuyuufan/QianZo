@@ -93,8 +93,8 @@ pnpm demo:seed
 
 ## 权威文档
 
-- [工程总纲](QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md)
-- [开发与 Git 工作流程](DEVELOPMENT_WORKFLOW.md)
-- [施工切片](BUILD_SLICES.md)
-- [S0 施工规格](slices/S0-project-draft/README.md)
-- [当前项目状态](PROJECT_STATUS.md)
+- [工程总纲](docs/QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md)
+- [开发与 Git 工作流程](docs/DEVELOPMENT_WORKFLOW.md)
+- [施工切片](docs/BUILD_SLICES.md)
+- [S0 施工规格](docs/slices/S0-project-draft/README.md)
+- [当前项目状态](docs/PROJECT_STATUS.md)

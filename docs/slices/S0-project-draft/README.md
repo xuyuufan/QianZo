@@ -6,7 +6,7 @@
 
 ## 1. 开工入口与边界
 
-先读 [AGENTS](../../AGENTS.md)、[工程总纲](../../QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md)、[开发与 Git 工作流程](../../DEVELOPMENT_WORKFLOW.md)，再按本 README 实施。[施工切片](../../BUILD_SLICES.md) 说明 S0 与后续 S1～S3 的关系。
+先读 [AGENTS](../../../AGENTS.md)、[工程总纲](../../QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md)、[开发与 Git 工作流程](../../DEVELOPMENT_WORKFLOW.md)，再按本 README 实施。[施工切片](../../BUILD_SLICES.md) 说明 S0 与后续 S1～S3 的关系。
 
 - 本 README 补足 S0 的实现细节；范围和不变量服从总纲，commit/远端规则服从 Workflow。
 - 实际开始实施需要用户明确要求执行 S0。仅阅读、规划或完善本文件，不构成业务开发授权。
