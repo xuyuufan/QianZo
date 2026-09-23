@@ -35,7 +35,14 @@ afterAll(async () => {
   await Promise.all([admin.end(), runtime.end()]);
 });
 
-const businessTables = ["aipm_messages", "aipm_sessions", "projects", "user_roles", "users"];
+const businessTables = [
+  "aipm_messages",
+  "aipm_sessions",
+  "projects",
+  "spec_versions",
+  "user_roles",
+  "users",
+];
 
 describe("application database boundary", () => {
   it("creates only the business tables the implemented slices use", async () => {
@@ -127,6 +134,8 @@ describe("application database boundary", () => {
     ["rewrite interview messages", "update app.aipm_messages set content = '改写历史'"],
     ["delete interview messages", "delete from app.aipm_messages"],
     ["move an interview session", "update app.aipm_sessions set project_id = gen_random_uuid()"],
+    ["rewrite a spec version", "update app.spec_versions set content = '{}'::jsonb"],
+    ["delete spec versions", "delete from app.spec_versions"],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
   });
@@ -159,6 +168,10 @@ describe("application database boundary", () => {
     [
       "insert an interview session with a chosen timestamp",
       "insert into app.aipm_sessions (id, project_id, created_at) values (gen_random_uuid(), gen_random_uuid(), now())",
+    ],
+    [
+      "insert a spec version with a chosen timestamp",
+      "insert into app.spec_versions (id, project_id, version_no, schema_version, content, created_by, created_at) values (gen_random_uuid(), gen_random_uuid(), 1, 1, '{}'::jsonb, gen_random_uuid(), now())",
     ],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });

@@ -48,11 +48,11 @@ test.afterAll(async () => {
   await adminSql.end();
 });
 
-test("an enterprise interviews with the mock AIPM and reviews the stored candidate", async ({
+test("an enterprise interviews, adopts a candidate and keeps the version history", async ({
   browser,
   page,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   const password = tools.DEMO_USER_PASSWORD;
 
   await loginDemoUser(page, "enterprise-a@qianzo.local", password);
@@ -83,9 +83,39 @@ test("an enterprise interviews with the mock AIPM and reviews the stored candida
     .fill("功能范围是需求整理、范围确认与锁定；验收标准按里程碑逐条核对。");
   await page.getByRole("button", { name: "生成候选 Spec" }).click();
   await expect(page.getByText("候选 Spec 已生成，可在下方预览。")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "最新候选 Spec（只读预览）" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "最新候选 Spec" })).toBeVisible();
   await expect(page.getByText("里程碑与验收")).toBeVisible();
   await expect(page.getByText("第 14 个自然日")).toBeVisible();
+
+  // Adopt the candidate into the first immutable version.
+  await page.getByRole("button", { name: "采用为当前 Spec 版本" }).click();
+  await expect(page.getByText("该候选已采用为版本 1，历史版本不会被覆盖。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Spec 版本 1（当前）" })).toBeVisible();
+  await expect(page.getByText("当前 Spec 版本 1")).toBeVisible();
+
+  // A manual save always appends: the earlier version stays readable.
+  const editor = page.getByLabel("Spec 文档（JSON）");
+  await expect(editor).toHaveValue(/我们希望把模糊需求整理成可招募的确认范围/);
+  const editedContent = (await editor.inputValue()).replace(
+    "我们希望把模糊需求",
+    "手工编辑后：我们希望把模糊需求",
+  );
+  await editor.fill(editedContent);
+  await page.getByRole("button", { name: "保存为新版本" }).click();
+  await expect(page.getByText("已保存为版本 2。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Spec 版本 2（当前）" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("link", { name: "版本 2" })).toBeVisible();
+  await page.getByRole("link", { name: "版本 1" }).click();
+  const reviewedVersion = page.getByTestId("spec-version-detail");
+  await expect(reviewedVersion.getByText("这是历史版本，不会被修改")).toBeVisible();
+  // The first version still holds what was adopted, not the later edit; the
+  // editor below it always starts from the current version.
+  await expect(reviewedVersion.getByText("手工编辑后：")).toHaveCount(0);
+  await expect(
+    reviewedVersion.getByText("我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。"),
+  ).toHaveCount(1);
 
   const privateMessage = "我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。";
   const specPath = `${projectPath}/spec`;

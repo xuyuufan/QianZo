@@ -15,8 +15,9 @@ import { AipmError } from "@/modules/aipm/errors";
 import type { InterviewTurnInput } from "@/modules/aipm/validation";
 import { assertActiveRole, type Actor } from "@/modules/identity/onboarding";
 import { projectIdSchema } from "@/modules/projects/validation";
+import { safeParseSpecDocument } from "@/modules/specs/document";
 import type { Database } from "@/platform/db/client";
-import { aipmMessages, aipmSessions, projects } from "@/platform/db/schema";
+import { aipmMessages, aipmSessions, projects, specVersions } from "@/platform/db/schema";
 
 export type Project = typeof projects.$inferSelect;
 
@@ -42,6 +43,8 @@ export type PreparedAipmInvocation = {
   request: AipmRequest;
   /** Project.version recorded together with the user message, before the call. */
   baseProjectVersion: number;
+  /** Current spec version the request was assembled from, if any. */
+  baseSpecVersionId: string | null;
 };
 
 export type CompletedAipmInvocation = {
@@ -122,9 +125,25 @@ export async function beginAipmInvocationWithDatabase(
       where id = ${project.id} and owner_id = ${actor.id}
     `);
 
+    // The current reviewed version is the generation baseline. A row that no
+    // longer validates is not sent to the provider.
+    const [currentSpec] = project.currentSpecVersionId
+      ? await transaction
+          .select()
+          .from(specVersions)
+          .where(eq(specVersions.id, project.currentSpecVersionId))
+          .limit(1)
+      : [];
+    const baseDocument = currentSpec
+      ? (safeParseSpecDocument(currentSpec.content).data ?? null)
+      : null;
+    const baseSpec =
+      currentSpec && baseDocument ? { versionId: currentSpec.id, document: baseDocument } : null;
+
     return {
       sessionId: session.id,
       baseProjectVersion: project.version + 1,
+      baseSpecVersionId: baseSpec?.versionId ?? null,
       request: {
         contractVersion: AIPM_CONTRACT_VERSION,
         invocationId,
@@ -142,8 +161,7 @@ export async function beginAipmInvocationWithDatabase(
           })),
           { role: "user" as const, content: input.message },
         ],
-        // S1-02 fills this in from the current spec version.
-        baseSpec: null,
+        baseSpec,
         ...(input.instruction ? { instruction: input.instruction } : {}),
       },
     };

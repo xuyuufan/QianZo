@@ -58,6 +58,10 @@ export const projects = appSchema.table(
     originalRequirement: text("original_requirement").notNull().default(""),
     status: text("status").notNull().default("DRAFT"),
     version: integer("version").notNull().default(1),
+    // The composite foreign key to `app.spec_versions (project_id, id)` is
+    // declared in the migration: it would make the two tables reference each
+    // other during module initialisation, and Drizzle never creates DDL here.
+    currentSpecVersionId: uuid("current_spec_version_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -113,6 +117,34 @@ export const aipmMessages = appSchema.table(
       "aipm_messages_payload_check",
       sql`${table.payload} is null or jsonb_typeof(${table.payload}) = 'object'`,
     ),
+  ],
+);
+
+export const specVersions = appSchema.table(
+  "spec_versions",
+  {
+    id: uuid("id").primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "restrict" }),
+    versionNo: integer("version_no").notNull(),
+    schemaVersion: integer("schema_version").notNull(),
+    content: jsonb("content").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    sourceMessageId: uuid("source_message_id").references(() => aipmMessages.id, {
+      onDelete: "restrict",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("spec_versions_project_version_unique").on(table.projectId, table.versionNo),
+    unique("spec_versions_project_id_unique").on(table.projectId, table.id),
+    unique("spec_versions_source_message_unique").on(table.sourceMessageId),
+    check("spec_versions_version_no_check", sql`${table.versionNo} > 0`),
+    check("spec_versions_schema_version_check", sql`${table.schemaVersion} = 1`),
+    check("spec_versions_content_check", sql`jsonb_typeof(${table.content}) = 'object'`),
   ],
 );
 

@@ -45,7 +45,7 @@ export async function invokeAipmWithDatabase(
     sessionId: prepared.sessionId,
     operation: input.operation,
     baseProjectVersion: prepared.baseProjectVersion,
-    baseSpecVersionId: prepared.request.baseSpec?.versionId ?? null,
+    baseSpecVersionId: prepared.baseSpecVersionId,
     response,
   });
 }
