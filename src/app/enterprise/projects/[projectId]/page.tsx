@@ -58,9 +58,14 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           <Link className="button button-link" href={`/enterprise/projects/${project.id}/spec`}>
             {locked ? "查看已锁定的 Spec" : "需求访谈与 Spec"}
           </Link>
+          {locked ? (
+            <Link className="button button-link" href={`/enterprise/projects/${project.id}/publish`}>
+              企业定金与发布
+            </Link>
+          ) : null}
           <span className="spec-muted">
             {locked
-              ? "锁定后不能再访谈、生成候选或另存版本。"
+              ? "锁定后不能再访谈、生成候选或另存版本；下一步是模拟企业定金。"
               : "先通过 Mock 访谈整理需求，保存并锁定 Spec，再发布招募。"}
           </span>
         </nav>

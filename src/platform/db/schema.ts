@@ -154,6 +154,42 @@ export const specVersions = appSchema.table(
   ],
 );
 
+export const payments = appSchema.table(
+  "payments",
+  {
+    id: uuid("id").primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "restrict" }),
+    payerId: uuid("payer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    purpose: text("purpose").notNull(),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
+    currency: text("currency").notNull(),
+    status: text("status").notNull().default("PENDING"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    succeededAt: timestamp("succeeded_at", { withTimezone: true }),
+  },
+  (table) => [
+    unique("payments_project_purpose_unique").on(table.projectId, table.purpose),
+    check("payments_purpose_check", sql`${table.purpose} = 'ENTERPRISE_DEPOSIT'`),
+    check("payments_amount_check", sql`${table.amountMinor} > 0`),
+    check(
+      "payments_currency_check",
+      sql`char_length(${table.currency}) = 3 and ${table.currency} = upper(${table.currency})`,
+    ),
+    check("payments_status_check", sql`${table.status} in ('PENDING', 'SUCCEEDED')`),
+    check(
+      "payments_succeeded_at_check",
+      sql`(${table.status} = 'PENDING' and ${table.succeededAt} is null) or (${table.status} = 'SUCCEEDED' and ${table.succeededAt} is not null)`,
+    ),
+  ],
+);
+
 export type UserRole = "ENTERPRISE" | "BUILDER";
 export type UserStatus = "ACTIVE" | "DISABLED";
 export type AipmMessageRole = "USER" | "ASSISTANT";
+export type PaymentStatus = "PENDING" | "SUCCEEDED";
+export type PaymentPurpose = "ENTERPRISE_DEPOSIT";

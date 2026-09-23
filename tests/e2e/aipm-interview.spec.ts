@@ -48,7 +48,7 @@ test.afterAll(async () => {
   await adminSql.end();
 });
 
-test("an enterprise interviews, adopts a candidate and keeps the version history", async ({
+test("a draft becomes a locked scope with a simulated enterprise deposit", async ({
   browser,
   page,
 }) => {
@@ -139,6 +139,21 @@ test("an enterprise interviews, adopts a candidate and keeps the version history
   await page.getByLabel("项目标题").fill("锁定后改名");
   await page.getByRole("button", { name: "保存草稿" }).click();
   await expect(page.locator('[data-error-code="SPEC_LOCKED"]')).toContainText("已锁定评审范围");
+
+  // Mock enterprise deposit: a fixed demo amount with a simulated success.
+  await page.getByRole("link", { name: "企业定金与发布" }).click();
+  await expect(page).toHaveURL(new RegExp(`${projectPath.replaceAll("/", "\\/")}/publish$`));
+  await expect(page.getByRole("heading", { name: "已锁定的范围" })).toBeVisible();
+  await page.getByRole("button", { name: "创建企业模拟定金" }).click();
+  await expect(page.getByText(/已创建企业模拟定金 ¥1\.00/)).toBeVisible();
+  await page.getByRole("button", { name: "模拟支付成功" }).click();
+  await expect(page.getByText(/发布仍需你在脱敏预览后手动确认/)).toBeVisible();
+  await expect(page.getByText(/付款只满足发布前置条件/)).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText(/付款只满足发布前置条件/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "模拟支付成功" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "创建企业模拟定金" })).toHaveCount(0);
 
   const privateMessage = "我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。";
   const specPath = `${projectPath}/spec`;

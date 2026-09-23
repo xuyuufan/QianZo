@@ -162,6 +162,12 @@ select {
   color: #075f50;
 }
 
+.form-message.info {
+  border: 1px solid #a9c3dc;
+  background: #f2f7fc;
+  color: #1c4a75;
+}
+
 .role-fieldset {
   display: grid;
   gap: 0.75rem;

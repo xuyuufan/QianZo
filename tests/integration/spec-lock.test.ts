@@ -31,6 +31,7 @@ import {
   requireLoopbackApiUrl,
   requireLoopbackDatabaseUrl,
 } from "../helpers/local-env";
+import { createProjectWithBudgetAndSpec } from "../helpers/project-fixture";
 import { validSpecDocument } from "../helpers/spec-fixture";
 
 let admin: ReturnType<typeof postgres>;
@@ -53,25 +54,12 @@ async function ensureAuthUser(email: string, password: string) {
 
 /** A draft with one saved version and a complete reference budget. */
 async function createLockableProject(actor: Actor = enterpriseA) {
-  const draft = await createProjectWithDatabase(database, actor, {
-    projectId: randomUUID(),
-    title: "S1 锁定项目",
-    originalRequirement: "希望把范围锁定后发布招募。",
-  });
-  const withBudget = await saveReferenceBudgetWithDatabase(database, actor, {
-    projectId: draft.id,
-    expectedVersion: draft.version,
-    minAmount: "1000",
-    maxAmount: "2500.5",
-  });
-  const version = await saveSpecVersionWithDatabase(database, actor, {
-    projectId: draft.id,
-    expectedVersion: withBudget.version,
-    document: validSpecDocument(),
-  });
-
-  // The saved version moved the project version on once more.
-  return { withBudget, version, projectVersion: withBudget.version + 1 };
+  const fixture = await createProjectWithBudgetAndSpec(database, actor);
+  return {
+    withBudget: fixture.withBudget,
+    version: fixture.specVersion,
+    projectVersion: fixture.projectVersion,
+  };
 }
 
 async function rawProject(projectId: string) {

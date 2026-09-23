@@ -38,6 +38,7 @@ afterAll(async () => {
 const businessTables = [
   "aipm_messages",
   "aipm_sessions",
+  "payments",
   "projects",
   "spec_versions",
   "user_roles",
@@ -136,6 +137,7 @@ describe("application database boundary", () => {
     ["move an interview session", "update app.aipm_sessions set project_id = gen_random_uuid()"],
     ["rewrite a spec version", "update app.spec_versions set content = '{}'::jsonb"],
     ["delete spec versions", "delete from app.spec_versions"],
+    ["delete payments", "delete from app.payments"],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
   });
@@ -177,6 +179,10 @@ describe("application database boundary", () => {
       "insert a project with a chosen budget",
       "insert into app.projects (id, owner_id, title, original_requirement, currency) values (gen_random_uuid(), gen_random_uuid(), '越权', '', 'CNY')",
     ],
+    [
+      "insert a payment with a chosen status",
+      "insert into app.payments (id, project_id, payer_id, purpose, amount_minor, currency, status) values (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'ENTERPRISE_DEPOSIT', 100, 'CNY', 'SUCCEEDED')",
+    ],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
   });
@@ -189,6 +195,10 @@ describe("application database boundary", () => {
         can_update_owner: boolean;
         can_update_status: boolean;
         can_insert_budget: boolean;
+        can_update_payment_status: boolean;
+        can_update_payment_amount: boolean;
+        can_update_payment_payer: boolean;
+        can_insert_payment_status: boolean;
       }[]
     >`
       select
@@ -196,7 +206,11 @@ describe("application database boundary", () => {
         has_column_privilege('qianzo_runtime', 'app.projects', 'locked_spec_version_id', 'UPDATE') as can_update_locked_pointer,
         has_column_privilege('qianzo_runtime', 'app.projects', 'owner_id', 'UPDATE') as can_update_owner,
         has_column_privilege('qianzo_runtime', 'app.projects', 'status', 'UPDATE') as can_update_status,
-        has_column_privilege('qianzo_runtime', 'app.projects', 'currency', 'INSERT') as can_insert_budget
+        has_column_privilege('qianzo_runtime', 'app.projects', 'currency', 'INSERT') as can_insert_budget,
+        has_column_privilege('qianzo_runtime', 'app.payments', 'status', 'UPDATE') as can_update_payment_status,
+        has_column_privilege('qianzo_runtime', 'app.payments', 'amount_minor', 'UPDATE') as can_update_payment_amount,
+        has_column_privilege('qianzo_runtime', 'app.payments', 'payer_id', 'UPDATE') as can_update_payment_payer,
+        has_column_privilege('qianzo_runtime', 'app.payments', 'status', 'INSERT') as can_insert_payment_status
     `;
 
     expect(privileges).toEqual({
@@ -206,6 +220,10 @@ describe("application database boundary", () => {
       // Status only becomes writable when the publish action lands (S1-05).
       can_update_status: false,
       can_insert_budget: false,
+      can_update_payment_status: true,
+      can_update_payment_amount: false,
+      can_update_payment_payer: false,
+      can_insert_payment_status: false,
     });
   });
 

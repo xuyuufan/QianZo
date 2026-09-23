@@ -64,6 +64,11 @@ export function describeBudget(
   if (minMinor === null || maxMinor === null || currency === null) {
     return null;
   }
+  return `${describeAmount(minMinor, currency)} – ${describeAmount(maxMinor, currency)}`;
+}
+
+/** A single amount with its symbol, e.g. the fixed mock deposit. */
+export function describeAmount(amountMinor: number, currency: string): string {
   const symbol = currency === "CNY" ? "¥" : `${currency} `;
-  return `${symbol}${formatMinorUnits(minMinor, currency)} – ${symbol}${formatMinorUnits(maxMinor, currency)}`;
+  return `${symbol}${formatMinorUnits(amountMinor, currency)}`;
 }

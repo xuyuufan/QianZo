@@ -209,11 +209,18 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
         <section className="project-form">
           <h2 className="subsection-title">锁定评审范围</h2>
           {locked ? (
-            <p className="form-message success" role="status">
-              已锁定 Spec 版本 {current?.versionNo}
-              {lockedAt ? `（${lockedAt}）` : ""}：标题、原始需求、参考预算
-              {budgetLabel ? `（${budgetLabel}）` : ""}与当前版本已冻结，S1 不提供解锁。
-            </p>
+            <>
+              <p className="form-message success" role="status">
+                已锁定 Spec 版本 {current?.versionNo}
+                {lockedAt ? `（${lockedAt}）` : ""}：标题、原始需求、参考预算
+                {budgetLabel ? `（${budgetLabel}）` : ""}与当前版本已冻结，S1 不提供解锁。
+              </p>
+              <p className="spec-muted">
+                <Link href={`/enterprise/projects/${project.id}/publish`}>
+                  下一步：模拟企业定金并发布招募 →
+                </Link>
+              </p>
+            </>
           ) : current ? (
             budgetLabel ? (
               <LockSpecForm

@@ -19,6 +19,11 @@ export async function clearDemoBusinessData(
   }
 
   await sql.begin(async (transaction) => {
+    // Payments reference both the project and the payer, so they go first.
+    await transaction`
+      delete from app.payments
+      where project_id in (select id from app.projects where owner_id in ${transaction(userIds)})
+    `;
     await transaction`
       delete from app.spec_versions
       where project_id in (select id from app.projects where owner_id in ${transaction(userIds)})
