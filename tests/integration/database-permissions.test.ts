@@ -53,8 +53,21 @@ describe("S0 database boundary", () => {
     expect(identity).toEqual({ user_name: "qianzo_runtime", is_superuser: false });
   });
 
+  it("keeps the runtime role free of memberships it could assume", async () => {
+    const memberships = await admin<{ parent_role: string }[]>`
+      select parent.rolname as parent_role
+      from pg_auth_members
+      join pg_roles parent on parent.oid = pg_auth_members.roleid
+      join pg_roles member on member.oid = pg_auth_members.member
+      where member.rolname = 'qianzo_runtime'
+    `;
+    expect(memberships).toEqual([]);
+  });
+
   it.each([
     ["create tables", "create table app.forbidden_table (id integer)"],
+    ["create a temporary table", "create temp table forbidden_temp (id integer)"],
+    ["assume another role", "set role authenticator"],
     ["delete rows", "delete from app.projects"],
     ["truncate rows", "truncate app.projects"],
     ["change an owner", "update app.projects set owner_id = gen_random_uuid()"],

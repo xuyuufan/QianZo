@@ -118,7 +118,7 @@ updateProjectDraft({ projectId, expectedVersion, title, originalRequirement })
 ## 6. 数据库权限与凭据
 
 - 业务表在私有 `app` schema，Supabase Data API exposed schemas 不含 app；撤销 PUBLIC/anon/authenticated 对业务 schema、表和函数的权限。
-- 应用连接账号 `qianzo_runtime` 不是表 owner，无 SUPERUSER/BYPASSRLS/CREATEDB/CREATEROLE/REPLICATION，无迁移或建表权限，不允许通过角色成员关系提权。
+- 应用连接账号 `qianzo_runtime` 不是表 owner，无 SUPERUSER/BYPASSRLS/CREATEDB/CREATEROLE/REPLICATION，无迁移或建表权限，不允许通过角色成员关系提权。迁移会撤销该角色既有的所有成员关系并验证 `SET ROLE` 被拒；数据库级 `TEMPORARY` 从 `PUBLIC` 撤销并只保留给 Supabase 内置服务角色，runtime 不能创建临时表。
 - runtime 仅有数据库 CONNECT、app USAGE 及本阶段必要 DML：users SELECT/INSERT、UPDATE(display_name, updated_at)；user_roles SELECT/INSERT；projects SELECT/INSERT、UPDATE(title, original_requirement, version, updated_at)。不给 DELETE/TRUNCATE，不给改用户状态、owner 或 project status 的权限。
 - 表由迁移账号创建；创建后精确授权，不使用“未来所有表全部可写”的默认 grants。runtime 在 public schema 同样不得具有建表权限。
 - S0 不配置 app 表的 RLS policy，也不模拟 JWT 注入数据库。用户资源隔离由服务层承担，必须做越权测试。
