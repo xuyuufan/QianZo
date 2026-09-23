@@ -8,6 +8,10 @@
 --    revoking CREATE on the public schema is not enough to keep the runtime
 --    role from creating temporary relations. TEMPORARY is revoked from PUBLIC
 --    and kept only for the built-in Supabase service roles.
+--
+-- Both paths must also clear grants recorded directly on the reused role: a
+-- database- or schema-level privilege in the role's own ACL survives a REVOKE
+-- aimed at PUBLIC, which is why the role is revoked explicitly as well.
 
 do $$
 declare
@@ -23,6 +27,10 @@ begin
   loop
     execute format('revoke %I from qianzo_runtime', membership.role_name);
   end loop;
+
+  execute format('revoke temporary, create on database %I from qianzo_runtime', current_database());
+  revoke create on schema app from qianzo_runtime;
+  revoke create on schema public from qianzo_runtime;
 
   execute format('revoke temporary on database %I from public', current_database());
 

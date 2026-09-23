@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import postgres from "postgres";
@@ -64,8 +65,55 @@ describe("S0 database boundary", () => {
     expect(memberships).toEqual([]);
   });
 
+  it("grants the runtime role no relation-creating privilege of its own", async () => {
+    const [privileges] = await admin<
+      {
+        can_create_temporary: boolean;
+        can_create_database: boolean;
+        can_create_app_schema: boolean;
+        can_create_public_schema: boolean;
+      }[]
+    >`
+      select
+        has_database_privilege('qianzo_runtime', current_database(), 'TEMPORARY') as can_create_temporary,
+        has_database_privilege('qianzo_runtime', current_database(), 'CREATE') as can_create_database,
+        has_schema_privilege('qianzo_runtime', 'app', 'CREATE') as can_create_app_schema,
+        has_schema_privilege('qianzo_runtime', 'public', 'CREATE') as can_create_public_schema
+    `;
+    expect(privileges).toEqual({
+      can_create_temporary: false,
+      can_create_database: false,
+      can_create_app_schema: false,
+      can_create_public_schema: false,
+    });
+  });
+
+  it("removes a direct TEMPORARY grant from the runtime role", async () => {
+    const hardening = readFileSync(
+      resolve(import.meta.dirname, "../../supabase/migrations/20260922020000_s0_runtime_role_hardening.sql"),
+      "utf8",
+    );
+    const [database] = await admin<{ name: string }[]>`select current_database() as name`;
+    try {
+      await admin`grant temporary on database ${admin(database.name)} to qianzo_runtime`;
+      const [granted] = await admin<{ can_create_temporary: boolean }[]>`
+        select has_database_privilege('qianzo_runtime', current_database(), 'TEMPORARY') as can_create_temporary
+      `;
+      expect(granted.can_create_temporary).toBe(true);
+    } finally {
+      // The role must never be left more privileged than the boundary allows.
+      await admin.unsafe(hardening);
+    }
+
+    const [revoked] = await admin<{ can_create_temporary: boolean }[]>`
+      select has_database_privilege('qianzo_runtime', current_database(), 'TEMPORARY') as can_create_temporary
+    `;
+    expect(revoked.can_create_temporary).toBe(false);
+  });
+
   it.each([
     ["create tables", "create table app.forbidden_table (id integer)"],
+    ["create a schema", "create schema forbidden_schema"],
     ["create a temporary table", "create temp table forbidden_temp (id integer)"],
     ["assume another role", "set role authenticator"],
     ["delete rows", "delete from app.projects"],
