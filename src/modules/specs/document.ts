@@ -242,11 +242,3 @@ export function parseSpecDocument(raw: unknown): SpecDocumentV1 {
 export function safeParseSpecDocument(raw: unknown) {
   return specDocumentSchema.safeParse(raw);
 }
-
-/** Field-level messages for the review UI, e.g. `milestones.0.dueAfterDays: ...`. */
-export function describeSpecIssues(error: z.ZodError): string[] {
-  return error.issues.map((issue) => {
-    const path = issue.path.join(".");
-    return path ? `${path}: ${issue.message}` : issue.message;
-  });
-}

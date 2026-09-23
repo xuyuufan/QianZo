@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { getProjectInterview } from "@/modules/aipm/service";
 import { getActorById } from "@/modules/identity/service";
+import { describeBudget } from "@/modules/projects/money";
 import { projectIdSchema } from "@/modules/projects/validation";
 import { emptySpecDraft } from "@/modules/specs/draft";
 import { getProjectSpecs } from "@/modules/specs/service";
@@ -12,6 +13,7 @@ import { getVerifiedUserId } from "@/platform/auth/server";
 import { ProjectHeader } from "../../project-header";
 import { AdoptCandidateForm } from "./adopt-candidate-form";
 import { InterviewForm } from "./interview-form";
+import { LockSpecForm } from "./lock-spec-form";
 import { SpecEditorForm } from "./spec-editor-form";
 import { SpecPreview } from "./spec-preview";
 
@@ -71,6 +73,10 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
 
   const editorDocument = current?.document ?? latestProposal ?? emptySpecDraft(project);
 
+  const locked = project.lockedSpecVersionId !== null;
+  const budgetLabel = describeBudget(project.budgetMinMinor, project.budgetMaxMinor, project.currency);
+  const lockedAt = project.lockedAt ? momentFormat.format(project.lockedAt) : null;
+
   return (
     <main className="workspace-shell">
       <ProjectHeader />
@@ -83,6 +89,7 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
             <p className="eyebrow">
               需求访谈与 Spec · 项目版本 {project.version}
               {current ? ` · 当前 Spec 版本 ${current.versionNo}` : " · 尚未保存 Spec"}
+              {locked ? " · 已锁定" : ""}
             </p>
             <h1 className="section-title">{project.title}</h1>
           </div>
@@ -133,7 +140,13 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
 
         <section className="project-form">
           <h2 className="subsection-title">发起访谈或生成候选</h2>
-          <InterviewForm projectId={project.id} version={project.version} />
+          {locked ? (
+            <p className="form-message success" role="status">
+              Spec 已锁定，访谈与候选生成已关闭。已有的对话与历史版本仍可查看。
+            </p>
+          ) : (
+            <InterviewForm projectId={project.id} version={project.version} />
+          )}
         </section>
 
         {latestCandidate && latestProposal ? (
@@ -142,6 +155,10 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
             {adoptedVersion ? (
               <p className="form-message success" role="status">
                 该候选已采用为版本 {adoptedVersion.versionNo}，历史版本不会被覆盖。
+              </p>
+            ) : locked ? (
+              <p className="form-message success" role="status">
+                范围已锁定，这条候选不能再被采用，仅作为历史保留。
               </p>
             ) : candidateMatchesProjectVersion ? (
               <AdoptCandidateForm
@@ -190,6 +207,34 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
         </section>
 
         <section className="project-form">
+          <h2 className="subsection-title">锁定评审范围</h2>
+          {locked ? (
+            <p className="form-message success" role="status">
+              已锁定 Spec 版本 {current?.versionNo}
+              {lockedAt ? `（${lockedAt}）` : ""}：标题、原始需求、参考预算
+              {budgetLabel ? `（${budgetLabel}）` : ""}与当前版本已冻结，S1 不提供解锁。
+            </p>
+          ) : current ? (
+            budgetLabel ? (
+              <LockSpecForm
+                projectId={project.id}
+                version={project.version}
+                specVersionId={current.id}
+                budgetLabel={budgetLabel}
+              />
+            ) : (
+              <p className="form-message error" role="alert" data-error-code="PAYMENT_REQUIRED">
+                锁定前请先在{" "}
+                <Link href={`/enterprise/projects/${project.id}`}>项目总览</Link>{" "}
+                补齐参考预算上下限；锁定会同时冻结这些金额。
+              </p>
+            )
+          ) : (
+            <p className="spec-muted">还没有保存过 Spec 版本，先采用候选或手工另存一版再锁定。</p>
+          )}
+        </section>
+
+        <section className="project-form">
           <h2 className="subsection-title">版本历史</h2>
           {versions.length === 0 ? (
             <p className="spec-muted">暂无版本记录。</p>
@@ -213,14 +258,22 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
 
         <section className="project-form">
           <h2 className="subsection-title">手工编辑并保存新版本</h2>
-          <p className="spec-muted">
-            保存永远新增版本，不覆盖历史。校验通过只会说明结构合法，不代表需求已经被确认。
-          </p>
-          <SpecEditorForm
-            projectId={project.id}
-            version={project.version}
-            initialContent={JSON.stringify(editorDocument, null, 2)}
-          />
+          {locked ? (
+            <p className="form-message success" role="status">
+              范围已锁定，不能再另存新版本；如需调整范围，S1 不提供解锁流程。
+            </p>
+          ) : (
+            <>
+              <p className="spec-muted">
+                保存永远新增版本，不覆盖历史。校验通过只会说明结构合法，不代表需求已经被确认。
+              </p>
+              <SpecEditorForm
+                projectId={project.id}
+                version={project.version}
+                initialContent={JSON.stringify(editorDocument, null, 2)}
+              />
+            </>
+          )}
         </section>
       </section>
     </main>

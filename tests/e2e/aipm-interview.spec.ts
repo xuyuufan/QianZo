@@ -117,6 +117,29 @@ test("an enterprise interviews, adopts a candidate and keeps the version history
     reviewedVersion.getByText("我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。"),
   ).toHaveCount(1);
 
+  // Reference budget lives on the project overview and is saved exactly.
+  await page.getByRole("link", { name: "← 返回项目总览" }).click();
+  await page.getByLabel("参考预算下限（CNY）").fill("1000");
+  await page.getByLabel("参考预算上限（CNY）").fill("2500.50");
+  await page.getByRole("button", { name: "保存参考预算" }).click();
+  await expect(page.getByText(/参考预算已保存：¥1000\.00 – ¥2500\.50/)).toBeVisible();
+
+  // Locking freezes the reviewed scope.
+  await page.getByRole("link", { name: "需求访谈与 Spec" }).click();
+  await page.getByRole("button", { name: "确认锁定当前版本" }).click();
+  await expect(page.getByText(/已锁定 Spec 版本 2/)).toBeVisible();
+  await expect(
+    page.getByText("Spec 已锁定，访谈与候选生成已关闭。已有的对话与历史版本仍可查看。"),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "确认锁定当前版本" })).toHaveCount(0);
+
+  // The original draft entry point can no longer rewrite the frozen scope.
+  await page.getByRole("link", { name: "← 返回项目总览" }).click();
+  await expect(page.getByText(/已锁定 Spec 版本：标题、原始需求与参考预算已冻结/)).toBeVisible();
+  await page.getByLabel("项目标题").fill("锁定后改名");
+  await page.getByRole("button", { name: "保存草稿" }).click();
+  await expect(page.locator('[data-error-code="SPEC_LOCKED"]')).toContainText("已锁定评审范围");
+
   const privateMessage = "我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。";
   const specPath = `${projectPath}/spec`;
 

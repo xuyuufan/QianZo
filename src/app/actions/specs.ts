@@ -5,10 +5,11 @@ import { z } from "zod";
 
 import type { SpecActionState } from "@/app/actions/spec-state";
 import { IdentityError } from "@/modules/identity/onboarding";
-import { describeSpecIssues, specDocumentSchema } from "@/modules/specs/document";
+import { specDocumentSchema } from "@/modules/specs/document";
 import { SpecError } from "@/modules/specs/errors";
-import { adoptSpecProposal, saveSpecVersion } from "@/modules/specs/service";
+import { adoptSpecProposal, lockSpec, saveSpecVersion } from "@/modules/specs/service";
 import { AuthenticationError, requireAuth } from "@/platform/auth/server";
+import { describeFieldIssues } from "@/platform/validation";
 
 function failure(state: Omit<SpecActionState, "successMessage">): SpecActionState {
   return { ...state, successMessage: null };
@@ -112,7 +113,7 @@ export async function saveSpecVersionAction(
     return failure({
       errorCode: "INVALID_DOCUMENT",
       message: "Spec 内容未通过校验，请修正下列问题后保存。",
-      issues: describeSpecIssues(parsed.error),
+      issues: describeFieldIssues(parsed.error),
     });
   }
 
@@ -133,6 +134,58 @@ export async function saveSpecVersionAction(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return failure({ errorCode: "VALIDATION_ERROR", message: "请检查提交的版本信息。", issues: [] });
+    }
+    return actionFailure(error);
+  }
+}
+
+/**
+ * Locking is confirmed by the page state ("已锁定版本 N"), so this action only
+ * has to explain why a lock was refused.
+ */
+export async function lockSpecAction(
+  projectId: string,
+  _previous: SpecActionState,
+  formData: FormData,
+): Promise<SpecActionState> {
+  try {
+    const userId = await requireAuth();
+    const locked = await lockSpec(userId, {
+      projectId,
+      specVersionId: formData.get("specVersionId"),
+      expectedVersion: formData.get("expectedVersion"),
+    });
+    revalidateSpecPages(projectId);
+    return {
+      errorCode: null,
+      message: null,
+      successMessage: `已锁定版本 ${locked.versionNo}。`,
+      issues: [],
+    };
+  } catch (error) {
+    if (error instanceof SpecError) {
+      switch (error.code) {
+        case "NOT_FOUND":
+          return failure({ errorCode: "NOT_FOUND", message: "项目或 Spec 版本不存在。", issues: [] });
+        case "VERSION_CONFLICT":
+          return failure({
+            errorCode: "VERSION_CONFLICT",
+            message: "项目已被更新，请刷新页面后再锁定。",
+            issues: [],
+          });
+        case "SPEC_LOCKED":
+          return failure({
+            errorCode: "SPEC_LOCKED",
+            message: "该范围已经锁定，S1 不支持解锁或另存新版本。",
+            issues: [],
+          });
+        default:
+          return failure({
+            errorCode: "INVALID_LOCK",
+            message: "还不能锁定：请先保存一份 Spec 版本，并在项目总览补齐参考预算。",
+            issues: [],
+          });
+      }
     }
     return actionFailure(error);
   }

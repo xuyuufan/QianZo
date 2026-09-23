@@ -4,7 +4,8 @@ import { useActionState, useMemo, useState } from "react";
 
 import { emptySpecActionState } from "@/app/actions/spec-state";
 import { saveSpecVersionAction } from "@/app/actions/specs";
-import { describeSpecIssues, specDocumentSchema } from "@/modules/specs/document";
+import { specDocumentSchema } from "@/modules/specs/document";
+import { describeFieldIssues } from "@/platform/validation";
 
 type SpecEditorFormProps = {
   projectId: string;
@@ -40,7 +41,7 @@ export function SpecEditorForm({ projectId, version, initialContent }: SpecEdito
       return { issues: ["内容不是合法的 JSON。"] };
     }
     const parsed = specDocumentSchema.safeParse(parsedJson);
-    return { issues: parsed.success ? [] : describeSpecIssues(parsed.error) };
+    return { issues: parsed.success ? [] : describeFieldIssues(parsed.error) };
   }, [content]);
 
   const issues = validation.issues.length > 0 ? validation.issues : state.issues;

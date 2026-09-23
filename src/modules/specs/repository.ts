@@ -14,7 +14,7 @@ import {
   type SpecDocumentV1,
 } from "./document";
 import { SpecError } from "./errors";
-import { adoptSpecProposalInputSchema, saveSpecVersionInputSchema } from "./validation";
+import { adoptSpecProposalInputSchema, lockSpecInputSchema, saveSpecVersionInputSchema } from "./validation";
 
 export type Project = typeof projects.$inferSelect;
 
@@ -152,6 +152,9 @@ export async function adoptSpecProposalWithDatabase(
     if (!project) {
       throw new SpecError("NOT_FOUND", "Project not found.");
     }
+    if (project.lockedSpecVersionId) {
+      throw new SpecError("SPEC_LOCKED", "The reviewed scope is locked.");
+    }
 
     // The source must be an assistant message of this project's own session.
     const [candidate] = await transaction
@@ -225,6 +228,9 @@ export async function saveSpecVersionWithDatabase(
     if (!project) {
       throw new SpecError("NOT_FOUND", "Project not found.");
     }
+    if (project.lockedSpecVersionId) {
+      throw new SpecError("SPEC_LOCKED", "The reviewed scope is locked.");
+    }
     if (project.version !== input.expectedVersion) {
       throw new SpecError("VERSION_CONFLICT", "The project has changed since it was opened.");
     }
@@ -238,6 +244,75 @@ export async function saveSpecVersionWithDatabase(
     });
     await moveCurrentPointer(transaction, project.id, version.id);
     return version;
+  });
+}
+
+/**
+ * Locks the current reviewed version. The project stays a draft; what changes is
+ * that the confirmed scope can no longer be rewritten.
+ */
+export async function lockSpecWithDatabase(
+  database: Database,
+  actor: Actor,
+  rawInput: unknown,
+): Promise<StoredSpecVersion> {
+  assertActiveRole(actor, "ENTERPRISE");
+  const input = lockSpecInputSchema.parse(rawInput);
+
+  return database.transaction(async (transaction) => {
+    const [project] = await transaction
+      .select()
+      .from(projects)
+      .where(and(eq(projects.id, input.projectId), eq(projects.ownerId, actor.id)))
+      .limit(1)
+      .for("update");
+
+    if (!project) {
+      throw new SpecError("NOT_FOUND", "Project not found.");
+    }
+
+    const [current] = project.currentSpecVersionId
+      ? await transaction
+          .select()
+          .from(specVersions)
+          .where(
+            and(
+              eq(specVersions.id, project.currentSpecVersionId),
+              eq(specVersions.projectId, project.id),
+            ),
+          )
+          .limit(1)
+      : [];
+
+    if (!current) {
+      throw new SpecError("INVALID_PROPOSAL", "There is no saved version to lock.");
+    }
+
+    // Replaying the same confirmation returns the already locked version.
+    if (project.lockedSpecVersionId === current.id) {
+      return toStoredSpecVersion(current);
+    }
+    if (project.lockedSpecVersionId) {
+      throw new SpecError("SPEC_LOCKED", "The reviewed scope is locked.");
+    }
+    if (input.specVersionId !== current.id) {
+      throw new SpecError("INVALID_PROPOSAL", "Only the current saved version can be locked.");
+    }
+    if (project.version !== input.expectedVersion) {
+      throw new SpecError("VERSION_CONFLICT", "The project has changed since it was opened.");
+    }
+    if (project.budgetMinMinor === null || project.budgetMaxMinor === null || !project.currency) {
+      throw new SpecError("INVALID_PROPOSAL", "A complete reference budget is required before locking.");
+    }
+
+    await transaction.execute(sql`
+      update app.projects
+      set locked_spec_version_id = ${current.id}, locked_at = now(),
+        version = version + 1, updated_at = now()
+      where id = ${project.id} and owner_id = ${actor.id}
+    `);
+
+    return toStoredSpecVersion(current);
   });
 }
 

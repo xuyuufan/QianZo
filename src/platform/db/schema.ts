@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   check,
   index,
   integer,
@@ -62,6 +63,11 @@ export const projects = appSchema.table(
     // declared in the migration: it would make the two tables reference each
     // other during module initialisation, and Drizzle never creates DDL here.
     currentSpecVersionId: uuid("current_spec_version_id"),
+    budgetMinMinor: bigint("budget_min_minor", { mode: "number" }),
+    budgetMaxMinor: bigint("budget_max_minor", { mode: "number" }),
+    currency: text("currency"),
+    lockedSpecVersionId: uuid("locked_spec_version_id"),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

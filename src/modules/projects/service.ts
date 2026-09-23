@@ -7,6 +7,7 @@ import {
   createProjectWithDatabase,
   getOwnProjectWithDatabase,
   listOwnProjectsWithDatabase,
+  saveReferenceBudgetWithDatabase,
   updateProjectDraftWithDatabase,
 } from "./repository";
 
@@ -28,4 +29,9 @@ export async function createProject(userId: string, input: unknown) {
 export async function updateProjectDraft(userId: string, input: unknown) {
   const actor = await requireRole(userId, "ENTERPRISE");
   return updateProjectDraftWithDatabase(getDatabase(), actor, input);
+}
+
+export async function saveReferenceBudget(userId: string, input: unknown) {
+  const actor = await requireRole(userId, "ENTERPRISE");
+  return saveReferenceBudgetWithDatabase(getDatabase(), actor, input);
 }

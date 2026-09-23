@@ -337,6 +337,17 @@ select {
   gap: 0.75rem;
 }
 
+.field-row {
+  display: grid;
+  gap: 1.1rem;
+}
+
+@media (min-width: 34rem) {
+  .field-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .form-actions .button.secondary {
   margin-top: 0;
 }

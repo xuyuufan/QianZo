@@ -6,8 +6,10 @@ import { projects } from "@/platform/db/schema";
 import {
   createProjectInputSchema,
   projectIdSchema,
+  saveReferenceBudgetInputSchema,
   updateProjectInputSchema,
   type CreateProjectInput,
+  type SaveReferenceBudgetInput,
   type UpdateProjectInput,
 } from "./validation";
 
@@ -15,7 +17,7 @@ export type Project = typeof projects.$inferSelect;
 
 export class ProjectError extends Error {
   constructor(
-    public readonly code: "NOT_FOUND" | "CREATE_CONFLICT" | "VERSION_CONFLICT",
+    public readonly code: "NOT_FOUND" | "CREATE_CONFLICT" | "VERSION_CONFLICT" | "SPEC_LOCKED",
     message: string,
   ) {
     super(message);
@@ -59,6 +61,11 @@ type ProjectRow = {
   status: string;
   version: number;
   current_spec_version_id: string | null;
+  budget_min_minor: number | null;
+  budget_max_minor: number | null;
+  currency: string | null;
+  locked_spec_version_id: string | null;
+  locked_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -72,6 +79,11 @@ function toProject(row: ProjectRow): Project {
     status: row.status,
     version: row.version,
     currentSpecVersionId: row.current_spec_version_id,
+    budgetMinMinor: row.budget_min_minor,
+    budgetMaxMinor: row.budget_max_minor,
+    currency: row.currency,
+    lockedSpecVersionId: row.locked_spec_version_id,
+    lockedAt: row.locked_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -93,7 +105,8 @@ export async function createProjectWithDatabase(
       values (${input.projectId}, ${actor.id}, ${input.title}, ${input.originalRequirement})
       on conflict do nothing
       returning id, owner_id, title, original_requirement, status, version,
-        current_spec_version_id, created_at, updated_at
+        current_spec_version_id, budget_min_minor, budget_max_minor, currency,
+        locked_spec_version_id, locked_at, created_at, updated_at
     `);
     const created = inserted[0];
     if (created) {
@@ -139,6 +152,11 @@ export async function updateProjectDraftWithDatabase(
     if (!current) {
       throw new ProjectError("NOT_FOUND", "Project not found.");
     }
+    // A locked scope never changes, including the title, the original
+    // requirement and the drafts saved from an old tab.
+    if (current.lockedSpecVersionId) {
+      throw new ProjectError("SPEC_LOCKED", "The reviewed scope is locked.");
+    }
     if (current.version !== input.expectedVersion) {
       throw new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened.");
     }
@@ -156,6 +174,61 @@ export async function updateProjectDraftWithDatabase(
           eq(projects.id, input.projectId),
           eq(projects.ownerId, actor.id),
           eq(projects.status, "DRAFT"),
+          eq(projects.version, input.expectedVersion),
+        ),
+      )
+      .returning();
+
+    if (!updated) {
+      throw new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened.");
+    }
+    return updated;
+  });
+}
+
+/**
+ * Reference budget for the recruitment view. Only the owning enterprise may set
+ * it, only while the scope is unlocked, and only as a complete validated range.
+ */
+export async function saveReferenceBudgetWithDatabase(
+  database: Database,
+  actor: Actor,
+  rawInput: unknown,
+): Promise<Project> {
+  assertEnterprise(actor);
+  const input: SaveReferenceBudgetInput = saveReferenceBudgetInputSchema.parse(rawInput);
+
+  return database.transaction(async (transaction) => {
+    const [current] = await transaction
+      .select()
+      .from(projects)
+      .where(and(eq(projects.id, input.projectId), eq(projects.ownerId, actor.id)))
+      .limit(1)
+      .for("update");
+
+    if (!current) {
+      throw new ProjectError("NOT_FOUND", "Project not found.");
+    }
+    if (current.lockedSpecVersionId) {
+      throw new ProjectError("SPEC_LOCKED", "The reviewed scope is locked.");
+    }
+    if (current.version !== input.expectedVersion) {
+      throw new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened.");
+    }
+
+    const [updated] = await transaction
+      .update(projects)
+      .set({
+        budgetMinMinor: input.minMinor,
+        budgetMaxMinor: input.maxMinor,
+        currency: input.currency,
+        version: sql`${projects.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(projects.id, input.projectId),
+          eq(projects.ownerId, actor.id),
           eq(projects.version, input.expectedVersion),
         ),
       )

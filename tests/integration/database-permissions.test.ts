@@ -173,8 +173,40 @@ describe("application database boundary", () => {
       "insert a spec version with a chosen timestamp",
       "insert into app.spec_versions (id, project_id, version_no, schema_version, content, created_by, created_at) values (gen_random_uuid(), gen_random_uuid(), 1, 1, '{}'::jsonb, gen_random_uuid(), now())",
     ],
+    [
+      "insert a project with a chosen budget",
+      "insert into app.projects (id, owner_id, title, original_requirement, currency) values (gen_random_uuid(), gen_random_uuid(), '越权', '', 'CNY')",
+    ],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
+  });
+
+  it("keeps the runtime column scope explicit", async () => {
+    const [privileges] = await admin<
+      {
+        can_update_budget: boolean;
+        can_update_locked_pointer: boolean;
+        can_update_owner: boolean;
+        can_update_status: boolean;
+        can_insert_budget: boolean;
+      }[]
+    >`
+      select
+        has_column_privilege('qianzo_runtime', 'app.projects', 'budget_min_minor', 'UPDATE') as can_update_budget,
+        has_column_privilege('qianzo_runtime', 'app.projects', 'locked_spec_version_id', 'UPDATE') as can_update_locked_pointer,
+        has_column_privilege('qianzo_runtime', 'app.projects', 'owner_id', 'UPDATE') as can_update_owner,
+        has_column_privilege('qianzo_runtime', 'app.projects', 'status', 'UPDATE') as can_update_status,
+        has_column_privilege('qianzo_runtime', 'app.projects', 'currency', 'INSERT') as can_insert_budget
+    `;
+
+    expect(privileges).toEqual({
+      can_update_budget: true,
+      can_update_locked_pointer: true,
+      can_update_owner: false,
+      // Status only becomes writable when the publish action lands (S1-05).
+      can_update_status: false,
+      can_insert_budget: false,
+    });
   });
 
   it.each(["anon", "authenticated"])("does not grant %s direct table access", async (role) => {

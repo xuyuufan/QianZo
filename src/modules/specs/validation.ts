@@ -20,5 +20,14 @@ export const saveSpecVersionInputSchema = z
   })
   .strict();
 
+export const lockSpecInputSchema = z
+  .object({
+    projectId: z.uuid(),
+    specVersionId: z.uuid(),
+    expectedVersion: z.coerce.number().int().positive(),
+  })
+  .strict();
+
 export type AdoptSpecProposalInput = z.infer<typeof adoptSpecProposalInputSchema>;
 export type SaveSpecVersionInput = z.infer<typeof saveSpecVersionInputSchema>;
+export type LockSpecInput = z.infer<typeof lockSpecInputSchema>;

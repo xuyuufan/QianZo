@@ -78,6 +78,10 @@ export async function beginAipmInvocationWithDatabase(
     if (!project) {
       throw new AipmError("NOT_FOUND", "Project not found.");
     }
+    // The interview closes with the scope: a locked project accepts no new turns.
+    if (project.lockedSpecVersionId) {
+      throw new AipmError("SPEC_LOCKED", "The reviewed scope is locked.");
+    }
     if (project.version !== input.expectedVersion) {
       throw new AipmError("VERSION_CONFLICT", "The project has changed since it was opened.");
     }
