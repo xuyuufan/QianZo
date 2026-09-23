@@ -1,6 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import type { Actor } from "@/modules/identity/onboarding";
-import { IdentityError } from "@/modules/identity/onboarding";
+import { assertActiveRole, type Actor } from "@/modules/identity/onboarding";
 import type { Database } from "@/platform/db/client";
 import { projects } from "@/platform/db/schema";
 
@@ -25,12 +24,7 @@ export class ProjectError extends Error {
 }
 
 function assertEnterprise(actor: Actor) {
-  if (actor.status !== "ACTIVE") {
-    throw new IdentityError("ACTOR_DISABLED", "This account is disabled.");
-  }
-  if (!actor.roles.includes("ENTERPRISE")) {
-    throw new IdentityError("ROLE_REQUIRED", "The ENTERPRISE role is required.");
-  }
+  assertActiveRole(actor, "ENTERPRISE");
 }
 
 export async function listOwnProjectsWithDatabase(database: Database, actor: Actor) {

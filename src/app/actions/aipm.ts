@@ -1,0 +1,102 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+import type { AipmActionState } from "@/app/actions/aipm-state";
+import { AipmError } from "@/modules/aipm/errors";
+import { invokeAipm } from "@/modules/aipm/service";
+import { IdentityError } from "@/modules/identity/onboarding";
+import { AuthenticationError, requireAuth } from "@/platform/auth/server";
+
+function actionFailure(error: unknown): AipmActionState {
+  if (error instanceof z.ZodError) {
+    return {
+      errorCode: "VALIDATION_ERROR",
+      message: "请填写 1～4000 字的访谈内容；如果页面停留过久，请刷新后重试。",
+      successMessage: null,
+    };
+  }
+  if (error instanceof AuthenticationError) {
+    return { errorCode: "AUTHENTICATION_REQUIRED", message: "请重新登录后再操作。", successMessage: null };
+  }
+  if (error instanceof IdentityError) {
+    if (error.code === "ROLE_REQUIRED") {
+      return { errorCode: "FORBIDDEN", message: "只有企业身份可以进行需求访谈。", successMessage: null };
+    }
+    if (error.code === "ACTOR_DISABLED") {
+      return { errorCode: "ACTOR_DISABLED", message: "账号已停用，无法继续操作。", successMessage: null };
+    }
+    return { errorCode: "ONBOARDING_REQUIRED", message: "请先完成身份设置。", successMessage: null };
+  }
+  if (error instanceof AipmError) {
+    switch (error.code) {
+      case "NOT_FOUND":
+        return { errorCode: "NOT_FOUND", message: "项目或访谈记录不存在。", successMessage: null };
+      case "VERSION_CONFLICT":
+        return {
+          errorCode: "VERSION_CONFLICT",
+          message: "项目已被更新，请刷新页面后再发送。",
+          successMessage: null,
+        };
+      case "SPEC_LOCKED":
+        return { errorCode: "SPEC_LOCKED", message: "Spec 已锁定，不能再继续访谈或生成候选。", successMessage: null };
+      case "MESSAGE_LIMIT_REACHED":
+        return {
+          errorCode: "MESSAGE_LIMIT_REACHED",
+          message: "本次访谈的消息数量已达上限，请先处理已生成的候选。",
+          successMessage: null,
+        };
+      case "PROVIDER_FAILED":
+        return {
+          errorCode: "PROVIDER_FAILED",
+          message: "本次访谈没有取得可用结果，你的输入已保留，可以重新发送。",
+          successMessage: null,
+        };
+      case "MISSING_SPEC":
+        return { errorCode: "MISSING_SPEC", message: "生成结果缺少候选 Spec，请重新生成。", successMessage: null };
+      default:
+        return {
+          errorCode: "INVALID_RESPONSE",
+          message: "访谈服务返回了不可用结果，本次没有产生候选，请重试。",
+          successMessage: null,
+        };
+    }
+  }
+  return { errorCode: "AIPM_ACTION_FAILED", message: "暂时无法完成访谈，请稍后再试。", successMessage: null };
+}
+
+export async function invokeAipmAction(
+  projectId: string,
+  _previous: AipmActionState,
+  formData: FormData,
+): Promise<AipmActionState> {
+  let result;
+  try {
+    const userId = await requireAuth();
+    result = await invokeAipm(userId, {
+      projectId,
+      expectedVersion: formData.get("expectedVersion"),
+      operation: formData.get("operation"),
+      message: formData.get("message"),
+      instruction: formData.get("instruction") || undefined,
+    });
+  } catch (error) {
+    return actionFailure(error);
+  }
+
+  revalidatePath(`/enterprise/projects/${projectId}`);
+  revalidatePath(`/enterprise/projects/${projectId}/spec`);
+
+  return { errorCode: null, message: null, successMessage: successMessageFor(result) };
+}
+
+function successMessageFor(result: { adoptableProjectVersion: number | null; hasProposal: boolean }) {
+  if (!result.hasProposal) {
+    return "已收到访谈回复。";
+  }
+  if (result.adoptableProjectVersion === null) {
+    return "候选已生成，但生成期间项目内容有改动，该候选已过期，请重新生成。";
+  }
+  return "候选 Spec 已生成，可在下方预览。";
+}

@@ -34,6 +34,19 @@ export class IdentityError extends Error {
   }
 }
 
+/**
+ * Shared guard for service boundaries: an actor must be ACTIVE and hold the
+ * expected role before any resource is read or written.
+ */
+export function assertActiveRole(actor: Actor, role: UserRole) {
+  if (actor.status !== "ACTIVE") {
+    throw new IdentityError("ACTOR_DISABLED", "This account is disabled.");
+  }
+  if (!actor.roles.includes(role)) {
+    throw new IdentityError("ROLE_REQUIRED", `The ${role} role is required.`);
+  }
+}
+
 export async function getActorByIdWithDatabase(
   database: Database,
   userId: string,

@@ -3,10 +3,12 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgSchema,
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -74,5 +76,46 @@ export const projects = appSchema.table(
   ],
 );
 
+export const aipmSessions = appSchema.table(
+  "aipm_sessions",
+  {
+    id: uuid("id").primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique("aipm_sessions_project_unique").on(table.projectId)],
+);
+
+export const aipmMessages = appSchema.table(
+  "aipm_messages",
+  {
+    id: uuid("id").primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => aipmSessions.id, { onDelete: "restrict" }),
+    // Server-assigned position. `now()` reports the transaction timestamp, so
+    // messages written by one transaction would tie on created_at; the explicit
+    // sequence keeps the transcript order stable.
+    sequence: integer("sequence").notNull(),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    payload: jsonb("payload"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("aipm_messages_session_sequence_unique").on(table.sessionId, table.sequence),
+    check("aipm_messages_role_check", sql`${table.role} in ('USER', 'ASSISTANT')`),
+    check("aipm_messages_sequence_check", sql`${table.sequence} > 0`),
+    check("aipm_messages_content_check", sql`char_length(${table.content}) between 1 and 8000`),
+    check(
+      "aipm_messages_payload_check",
+      sql`${table.payload} is null or jsonb_typeof(${table.payload}) = 'object'`,
+    ),
+  ],
+);
+
 export type UserRole = "ENTERPRISE" | "BUILDER";
 export type UserStatus = "ACTIVE" | "DISABLED";
+export type AipmMessageRole = "USER" | "ASSISTANT";

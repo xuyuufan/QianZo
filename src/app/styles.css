@@ -313,6 +313,113 @@ select {
   text-decoration: none;
 }
 
+.subsection-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.step-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.step-links .button-link {
+  width: fit-content;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.form-actions .button.secondary {
+  margin-top: 0;
+}
+
+.interview-thread {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.interview-message {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--paper);
+}
+
+.interview-message-user {
+  border-color: #8bc7b8;
+  background: #effbf7;
+}
+
+.interview-role {
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.interview-content {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+
+.spec-preview {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.spec-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.spec-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.spec-section p,
+.spec-section ul,
+.spec-section ol {
+  margin: 0;
+}
+
+.spec-section ul,
+.spec-section ol {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.25rem;
+  line-height: 1.65;
+}
+
+.spec-muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.spec-milestone {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--paper);
+}
+
 .status-pill {
   padding: 0.4rem 0.65rem;
   border-radius: 999px;

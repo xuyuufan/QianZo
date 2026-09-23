@@ -9,6 +9,7 @@ import {
   requireLoopbackApiUrl,
   requireLoopbackDatabaseUrl,
 } from "../helpers/local-env";
+import { clearDemoBusinessData } from "../helpers/demo-data";
 
 const { tools, app } = loadLocalEnv(resolve(process.cwd()));
 if (!tools.DEMO_USER_PASSWORD || !tools.SUPABASE_SERVICE_ROLE_KEY) {
@@ -44,12 +45,12 @@ test.beforeAll(async () => {
   ]);
   demoUserIds = data.users.filter((user) => user.email && emails.has(user.email)).map((user) => user.id);
   if (demoUserIds.length !== 3) throw new Error("Run pnpm demo:seed before the project E2E tests.");
-  await adminSql`delete from app.projects where owner_id in ${adminSql(demoUserIds)}`;
+  await clearDemoBusinessData(adminSql, demoUserIds);
 });
 
 test.afterAll(async () => {
   if (demoUserIds.length) {
-    await adminSql`delete from app.projects where owner_id in ${adminSql(demoUserIds)}`;
+    await clearDemoBusinessData(adminSql, demoUserIds);
   }
   await adminSql.end();
 });

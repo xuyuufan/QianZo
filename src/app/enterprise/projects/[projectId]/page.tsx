@@ -44,6 +44,12 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         </div>
         {saved ? <p className="form-message success" role="status">草稿已保存。</p> : null}
         <EditProjectForm project={project} />
+        <nav className="step-links">
+          <Link className="button button-link" href={`/enterprise/projects/${project.id}/spec`}>
+            需求访谈与 Spec
+          </Link>
+          <span className="spec-muted">先通过 Mock 访谈整理需求，再保存并锁定 Spec。</span>
+        </nav>
       </section>
     </main>
   );

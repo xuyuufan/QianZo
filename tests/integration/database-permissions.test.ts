@@ -35,15 +35,17 @@ afterAll(async () => {
   await Promise.all([admin.end(), runtime.end()]);
 });
 
-describe("S0 database boundary", () => {
-  it("creates only the three S0 business tables", async () => {
+const businessTables = ["aipm_messages", "aipm_sessions", "projects", "user_roles", "users"];
+
+describe("application database boundary", () => {
+  it("creates only the business tables the implemented slices use", async () => {
     const tables = await admin<{ table_name: string }[]>`
       select table_name
       from information_schema.tables
       where table_schema = 'app'
       order by table_name
     `;
-    expect(tables.map((row) => row.table_name)).toEqual(["projects", "user_roles", "users"]);
+    expect(tables.map((row) => row.table_name)).toEqual(businessTables);
   });
 
   it("connects as the restricted runtime role", async () => {
@@ -122,6 +124,9 @@ describe("S0 database boundary", () => {
     ["change project status", "update app.projects set status = 'OPEN'"],
     ["change user status", "update app.users set status = 'DISABLED'"],
     ["elevate roles", "alter role qianzo_runtime superuser"],
+    ["rewrite interview messages", "update app.aipm_messages set content = '改写历史'"],
+    ["delete interview messages", "delete from app.aipm_messages"],
+    ["move an interview session", "update app.aipm_sessions set project_id = gen_random_uuid()"],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
   });
@@ -147,17 +152,27 @@ describe("S0 database boundary", () => {
       "insert a role with a chosen timestamp",
       "insert into app.user_roles (user_id, role, created_at) values (gen_random_uuid(), 'ENTERPRISE', now())",
     ],
+    [
+      "insert an interview message with a chosen timestamp",
+      "insert into app.aipm_messages (id, session_id, sequence, role, content, created_at) values (gen_random_uuid(), gen_random_uuid(), 1, 'USER', '越权', now())",
+    ],
+    [
+      "insert an interview session with a chosen timestamp",
+      "insert into app.aipm_sessions (id, project_id, created_at) values (gen_random_uuid(), gen_random_uuid(), now())",
+    ],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
   });
 
   it.each(["anon", "authenticated"])("does not grant %s direct table access", async (role) => {
-    await expect(
-      admin.begin(async (transaction) => {
-        await transaction.unsafe(`set local role ${role}`);
-        await transaction`select * from app.projects`;
-      }),
-    ).rejects.toMatchObject({ severity: "ERROR" });
+    for (const table of businessTables) {
+      await expect(
+        admin.begin(async (transaction) => {
+          await transaction.unsafe(`set local role ${role}`);
+          await transaction.unsafe(`select * from app.${table}`);
+        }),
+      ).rejects.toMatchObject({ severity: "ERROR" });
+    }
   });
 
   it("does not expose the app schema through the Data API", async () => {
