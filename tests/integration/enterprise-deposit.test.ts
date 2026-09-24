@@ -228,6 +228,7 @@ describe("enterprise mock deposit", () => {
     const versionBefore = await rawProjectVersion(fixture.project.id);
 
     const succeeded = await simulatePaymentSuccessWithDatabase(database, enterpriseA, {
+      projectId: fixture.project.id,
       paymentId: payment.id,
     });
 
@@ -236,6 +237,7 @@ describe("enterprise mock deposit", () => {
     expect(await rawProjectVersion(fixture.project.id)).toBe(versionBefore + 1);
 
     const replay = await simulatePaymentSuccessWithDatabase(database, enterpriseA, {
+      projectId: fixture.project.id,
       paymentId: payment.id,
     });
 
@@ -254,18 +256,48 @@ describe("enterprise mock deposit", () => {
     });
 
     await expect(
-      simulatePaymentSuccessWithDatabase(database, enterpriseB, { paymentId: payment.id }),
+      simulatePaymentSuccessWithDatabase(database, enterpriseB, {
+        projectId: fixture.project.id,
+        paymentId: payment.id,
+      }),
     ).rejects.toMatchObject({ name: "PaymentError", code: "NOT_FOUND" });
 
     await expect(
-      simulatePaymentSuccessWithDatabase(database, builder, { paymentId: payment.id }),
+      simulatePaymentSuccessWithDatabase(database, builder, {
+        projectId: fixture.project.id,
+        paymentId: payment.id,
+      }),
     ).rejects.toMatchObject({ name: "IdentityError", code: "ROLE_REQUIRED" });
 
     await expect(
-      simulatePaymentSuccessWithDatabase(database, enterpriseA, { paymentId: randomUUID() }),
+      simulatePaymentSuccessWithDatabase(database, enterpriseA, {
+        projectId: fixture.project.id,
+        paymentId: randomUUID(),
+      }),
     ).rejects.toMatchObject({ name: "PaymentError", code: "NOT_FOUND" });
 
     const stored = await rawPayment(payment.id);
+    expect(stored.status).toBe("PENDING");
+  });
+
+  it("refuses to confirm a deposit through another project's request", async () => {
+    // One owner, two projects: the intent must be bound to the project whose
+    // page raised it, not merely to a payment the actor happens to own.
+    const first = await createLockedProject();
+    const second = await createLockedProject();
+    const { provider } = createRecordingProvider();
+    const otherPayment = await createEnterpriseDepositWithDatabase(database, enterpriseA, provider, {
+      projectId: second.project.id,
+    });
+
+    await expect(
+      simulatePaymentSuccessWithDatabase(database, enterpriseA, {
+        projectId: first.project.id,
+        paymentId: otherPayment.id,
+      }),
+    ).rejects.toMatchObject({ name: "PaymentError", code: "NOT_FOUND" });
+
+    const stored = await rawPayment(otherPayment.id);
     expect(stored.status).toBe("PENDING");
   });
 
@@ -278,8 +310,14 @@ describe("enterprise mock deposit", () => {
     const versionBefore = await rawProjectVersion(fixture.project.id);
 
     const results = await Promise.allSettled([
-      simulatePaymentSuccessWithDatabase(database, enterpriseA, { paymentId: payment.id }),
-      simulatePaymentSuccessWithDatabase(database, enterpriseA, { paymentId: payment.id }),
+      simulatePaymentSuccessWithDatabase(database, enterpriseA, {
+        projectId: fixture.project.id,
+        paymentId: payment.id,
+      }),
+      simulatePaymentSuccessWithDatabase(database, enterpriseA, {
+        projectId: fixture.project.id,
+        paymentId: payment.id,
+      }),
     ]);
 
     expect(results.every((result) => result.status === "fulfilled")).toBe(true);
@@ -296,7 +334,10 @@ describe("enterprise mock deposit", () => {
     const payment = await createEnterpriseDepositWithDatabase(database, enterpriseA, provider, {
       projectId: fixture.project.id,
     });
-    await simulatePaymentSuccessWithDatabase(database, enterpriseA, { paymentId: payment.id });
+    await simulatePaymentSuccessWithDatabase(database, enterpriseA, {
+      projectId: fixture.project.id,
+      paymentId: payment.id,
+    });
     const succeeded = await rawPayment(payment.id);
 
     const statements = [

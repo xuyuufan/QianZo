@@ -35,12 +35,31 @@ type Sql = ReturnType<typeof postgres>;
 type ToolsEnv = Record<string, string | undefined>;
 type SuperuserProbe = { ok: true; url: string } | { ok: false; reason: string };
 
-function loadToolsEnv(): ToolsEnv | null {
+/**
+ * The connection strings may come from the local tool files or straight from the
+ * process environment, for example in a runner that exports them without
+ * creating the files. Both sources are consulted so an available superuser
+ * connection is never mistaken for a missing one.
+ */
+const connectionEnvKeys = ["SUPABASE_DB_ADMIN_URL", "SUPABASE_DB_SUPERUSER_URL"] as const;
+
+function loadToolsEnv(): ToolsEnv {
+  let fromFile: ToolsEnv = {};
   try {
-    return loadLocalEnv(resolve(import.meta.dirname, "../..")).tools;
+    fromFile = loadLocalEnv(resolve(import.meta.dirname, "../..")).tools;
   } catch {
-    return null;
+    // No local tool file: fall back to the process environment below.
   }
+
+  const fromProcess: ToolsEnv = {};
+  for (const key of connectionEnvKeys) {
+    const value = process.env[key];
+    if (value) {
+      fromProcess[key] = value;
+    }
+  }
+
+  return { ...fromFile, ...fromProcess };
 }
 
 function resolveSuperuserUrl(tools: ToolsEnv): URL {
@@ -56,11 +75,7 @@ function resolveSuperuserUrl(tools: ToolsEnv): URL {
   return adminUrl;
 }
 
-async function probeSuperuser(tools: ToolsEnv | null): Promise<SuperuserProbe> {
-  if (!tools) {
-    return { ok: false, reason: ".env.tools.local 不存在，无法取得管理员连接串" };
-  }
-
+async function probeSuperuser(tools: ToolsEnv): Promise<SuperuserProbe> {
   let url: URL;
   try {
     url = resolveSuperuserUrl(tools);

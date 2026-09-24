@@ -38,6 +38,36 @@ describe("AIPM request contract", () => {
     expect(aipmRequestSchema.safeParse(validAipmRequest()).success).toBe(true);
   });
 
+  it("caps each transcript entry by the limit of the role that produced it", () => {
+    const pastUserLimit = "需".repeat(aipmLimits.userMessageLength + 1);
+
+    expect(
+      aipmRequestSchema.safeParse({
+        ...validAipmRequest(),
+        messages: [{ role: "user", content: pastUserLimit }],
+      }).success,
+    ).toBe(false);
+
+    // The platform echoes its own replies back into the next transcript, so an
+    // assistant entry may legitimately run to the assistant limit; applying the
+    // user limit to it would make the platform reject its own request.
+    expect(
+      aipmRequestSchema.safeParse({
+        ...validAipmRequest(),
+        messages: [{ role: "assistant", content: pastUserLimit }],
+      }).success,
+    ).toBe(true);
+
+    expect(
+      aipmRequestSchema.safeParse({
+        ...validAipmRequest(),
+        messages: [
+          { role: "assistant", content: "答".repeat(aipmLimits.assistantMessageLength + 1) },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects an empty message and an undeclared field", () => {
     const empty = validAipmRequest({ messages: [{ role: "user", content: "" }] });
     expect(aipmRequestSchema.safeParse(empty).success).toBe(false);

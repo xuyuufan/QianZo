@@ -473,6 +473,7 @@ describe("publish transaction", () => {
     // Spec section 6: a repeated success request after the project is OPEN
     // returns the same result without touching timestamps or the version.
     const replay = await simulatePaymentSuccessWithDatabase(database, enterpriseA, {
+      projectId: fixture.project.id,
       paymentId: payment.id,
     });
 

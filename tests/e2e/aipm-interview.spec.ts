@@ -171,6 +171,13 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(page.getByRole("button", { name: "确认并发布招募" })).toHaveCount(0);
   await expect(page.getByText("已锁定的范围")).toHaveCount(1);
 
+  // Publishing locks the scope, but the enterprise detail must still report the
+  // real status instead of falling back to DRAFT.
+  await page.goto(projectPath);
+  await expect(page.getByText(/已发布 · 版本 \d+/)).toBeVisible();
+  await expect(page.locator(".status-pill")).toHaveText("OPEN · 已锁定范围");
+  await expect(page.getByText("DRAFT · 已锁定范围")).toHaveCount(0);
+
   const privateMessage = "ZZSECRET-访谈：我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。";
   const privateRequirement = "ZZSECRET-原始需求：需要把访谈整理成可招募的确认范围。";
   const specPath = `${projectPath}/spec`;

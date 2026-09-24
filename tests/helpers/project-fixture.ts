@@ -101,6 +101,7 @@ export async function createDepositPaidProject(
     projectId: fixture.project.id,
   });
   const payment = await simulatePaymentSuccessWithDatabase(database, actor, {
+    projectId: fixture.project.id,
     paymentId: deposit.id,
   });
 

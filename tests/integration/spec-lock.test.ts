@@ -226,6 +226,30 @@ describe("reference budget and locked scope", () => {
     expect(afterReplay.version).toBe(stored.version);
   });
 
+  it("refuses a stale lock confirmation that names another version", async () => {
+    const { version, projectVersion } = await createLockableProject();
+    await lockSpecWithDatabase(database, enterpriseA, {
+      projectId: version.projectId,
+      specVersionId: version.id,
+      expectedVersion: projectVersion,
+    });
+
+    const other = await createLockableProject();
+
+    // "Already locked" is only a safe replay when the submitted version is the
+    // one that was locked; naming a different version is a different intent.
+    await expect(
+      lockSpecWithDatabase(database, enterpriseA, {
+        projectId: version.projectId,
+        specVersionId: other.version.id,
+        expectedVersion: projectVersion,
+      }),
+    ).rejects.toMatchObject({ name: "SpecError", code: "SPEC_LOCKED" });
+
+    const stored = await rawProject(version.projectId);
+    expect(stored.locked_spec_version_id).toBe(version.id);
+  });
+
   it("refuses to lock without a saved version, without a budget or with another project's version", async () => {
     const draft = await createProjectWithDatabase(database, enterpriseA, {
       projectId: randomUUID(),
