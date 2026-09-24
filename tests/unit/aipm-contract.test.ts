@@ -83,7 +83,9 @@ describe("AIPM response validation", () => {
 
   const correlationCases: Array<[string, Record<string, unknown>, string]> = [
     ["the wrong invocation id", { invocationId: "6d0d2b1e-6a9f-4a4f-9e3a-5a1b2c3d4e5f" }, "CONTRACT_MISMATCH"],
-    ["the wrong contract version", { contractVersion: "2" }, "INVALID_RESPONSE"],
+    // There is no separate contract-version comparison: the response schema pins
+    // the version with `z.literal`, so an unexpected version fails parsing first.
+    ["an unexpected contract version", { contractVersion: "2" }, "INVALID_RESPONSE"],
   ];
 
   it.each(correlationCases)("rejects a response with %s", (_label, override, expectedCode) => {

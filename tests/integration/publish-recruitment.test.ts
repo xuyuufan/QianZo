@@ -7,6 +7,7 @@ import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { completeOnboardingWithDatabase, type Actor } from "@/modules/identity/onboarding";
+import { simulatePaymentSuccessWithDatabase } from "@/modules/payments/repository";
 import { publishProjectWithDatabase } from "@/modules/projects/publish";
 import { saveReferenceBudgetWithDatabase } from "@/modules/projects/repository";
 import { publishProjectInputSchema } from "@/modules/projects/validation";
@@ -98,6 +99,16 @@ async function rawProject(projectId: string) {
   >`
     select status, version, published_at, published_spec_snapshot
     from app.projects where id = ${projectId}
+  `;
+  return row;
+}
+
+async function rawPayment(paymentId: string) {
+  const [row] = await admin<
+    { status: string; succeeded_at: Date | null; updated_at: Date }[]
+  >`
+    select status, succeeded_at, updated_at
+    from app.payments where id = ${paymentId}
   `;
   return row;
 }
@@ -373,6 +384,130 @@ describe("publish transaction", () => {
 
     const after = await rawProject(fixture.project.id);
     expect(after).toEqual(published);
+  });
+
+  it("publishes exactly once under two concurrent identical intents", async () => {
+    const { fixture, projectVersion } = await createDepositPaidProject(database, enterpriseA);
+    const masked = validSpecDocument();
+
+    const results = await Promise.allSettled([
+      publishProjectWithDatabase(database, enterpriseA, publishInput(fixture, projectVersion, masked)),
+      publishProjectWithDatabase(database, enterpriseA, publishInput(fixture, projectVersion, masked)),
+    ]);
+
+    // Both intents resolve; the loser recognises the winner's result instead of
+    // writing a second time.
+    expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+    const published = results.map(
+      (result) => (result as PromiseFulfilledResult<Awaited<ReturnType<typeof publishProjectWithDatabase>>>).value,
+    );
+    expect(new Set(published.map((project) => project.publishedAt?.getTime())).size).toBe(1);
+
+    const stored = await rawProject(fixture.project.id);
+    expect(stored.status).toBe("OPEN");
+    // At most one state change: the version token moved exactly once.
+    expect(stored.version).toBe(projectVersion + 1);
+    expect(stored.published_at).not.toBeNull();
+    for (const project of published) {
+      expect(project.version).toBe(stored.version);
+      expect(project.publishedAt?.getTime()).toBe(stored.published_at?.getTime());
+    }
+  });
+
+  it("rejects the loser of two concurrent conflicting previews without a second write", async () => {
+    const { fixture, projectVersion } = await createDepositPaidProject(database, enterpriseA);
+    const firstPreview = validSpecDocument();
+    const secondPreview = validSpecDocument();
+    secondPreview.projectGoal = "另一版脱敏目标。";
+
+    const results = await Promise.allSettled([
+      publishProjectWithDatabase(
+        database,
+        enterpriseA,
+        publishInput(fixture, projectVersion, firstPreview),
+      ),
+      publishProjectWithDatabase(
+        database,
+        enterpriseA,
+        publishInput(fixture, projectVersion, secondPreview),
+      ),
+    ]);
+
+    const fulfilled = results.filter((result) => result.status === "fulfilled");
+    const rejected = results.filter((result) => result.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({
+      name: "ProjectError",
+      code: "PUBLISH_CONFLICT",
+    });
+
+    const stored = await rawProject(fixture.project.id);
+    expect(stored.status).toBe("OPEN");
+    expect(stored.version).toBe(projectVersion + 1);
+    expect(stored.published_at).not.toBeNull();
+
+    // The stored snapshot is exactly the winner's preview, never a mix.
+    const winner = (fulfilled[0] as PromiseFulfilledResult<
+      Awaited<ReturnType<typeof publishProjectWithDatabase>>
+    >).value;
+    const storedGoal = (stored.published_spec_snapshot as { document: { projectGoal: string } })
+      .document.projectGoal;
+    const winnerGoal = (winner.publishedSpecSnapshot as { document: { projectGoal: string } })
+      .document.projectGoal;
+    expect(storedGoal).toBe(winnerGoal);
+    expect([firstPreview.projectGoal, secondPreview.projectGoal]).toContain(winnerGoal);
+  });
+
+  it("returns the same succeeded deposit after publishing, changing nothing", async () => {
+    const { fixture, payment, projectVersion } = await createDepositPaidProject(database, enterpriseA);
+    await publishProjectWithDatabase(
+      database,
+      enterpriseA,
+      publishInput(fixture, projectVersion, validSpecDocument()),
+    );
+    const published = await rawProject(fixture.project.id);
+    const paymentBefore = await rawPayment(payment.id);
+    expect(paymentBefore.status).toBe("SUCCEEDED");
+
+    // Spec section 6: a repeated success request after the project is OPEN
+    // returns the same result without touching timestamps or the version.
+    const replay = await simulatePaymentSuccessWithDatabase(database, enterpriseA, {
+      paymentId: payment.id,
+    });
+
+    expect(replay.status).toBe("SUCCEEDED");
+    expect(replay.succeededAt?.getTime()).toBe(paymentBefore.succeeded_at?.getTime());
+
+    const after = await rawProject(fixture.project.id);
+    expect(after.version).toBe(published.version);
+    expect(after.published_at?.getTime()).toBe(published.published_at?.getTime());
+    expect(after.published_spec_snapshot).toEqual(published.published_spec_snapshot);
+
+    const paymentAfter = await rawPayment(payment.id);
+    expect(paymentAfter.succeeded_at?.getTime()).toBe(paymentBefore.succeeded_at?.getTime());
+    expect(paymentAfter.updated_at.getTime()).toBe(paymentBefore.updated_at.getTime());
+  });
+
+  it("keeps publishing private to the owning enterprise and the enterprise role", async () => {
+    const { fixture, projectVersion } = await createDepositPaidProject(database, enterpriseA);
+    const input = () => publishInput(fixture, projectVersion, validSpecDocument());
+
+    // Another enterprise reads "not found" instead of learning the project exists.
+    await expect(publishProjectWithDatabase(database, enterpriseB, input())).rejects.toMatchObject({
+      name: "ProjectError",
+      code: "NOT_FOUND",
+    });
+    await expect(publishProjectWithDatabase(database, builder, input())).rejects.toMatchObject({
+      name: "IdentityError",
+      code: "ROLE_REQUIRED",
+    });
+
+    const stored = await rawProject(fixture.project.id);
+    expect(stored.status).toBe("DRAFT");
+    expect(stored.published_at).toBeNull();
+    expect(stored.published_spec_snapshot).toBeNull();
+    expect(stored.version).toBe(projectVersion);
   });
 });
 

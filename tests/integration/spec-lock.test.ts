@@ -319,6 +319,68 @@ describe("reference budget and locked scope", () => {
     expect(history?.current?.id).toBe(version.id);
   });
 
+  it("checks the locked scope before the expected version on a manual save", async () => {
+    const { version, projectVersion } = await createLockableProject();
+    await lockSpecWithDatabase(database, enterpriseA, {
+      projectId: version.projectId,
+      specVersionId: version.id,
+      expectedVersion: projectVersion,
+    });
+
+    // A stale tab still holds the pre-lock version. The locked-scope refusal
+    // must win over the version conflict: the shared lock helper checks
+    // not found → locked scope → version drift, exactly like the inline code
+    // it replaced.
+    await expect(
+      saveSpecVersionWithDatabase(database, enterpriseA, {
+        projectId: version.projectId,
+        expectedVersion: projectVersion,
+        document: validSpecDocument(),
+      }),
+    ).rejects.toMatchObject({ name: "SpecError", code: "SPEC_LOCKED" });
+
+    const stored = await rawProject(version.projectId);
+    expect(stored.version).toBe(projectVersion + 1);
+  });
+
+  it("checks the locked scope before the candidate's staleness on adoption", async () => {
+    const { version, projectVersion } = await createLockableProject();
+    const turn = await invokeAipmWithDatabase(database, enterpriseA, createMockAipmGateway(), {
+      projectId: version.projectId,
+      expectedVersion: projectVersion,
+      operation: "GENERATE_SPEC",
+      message: "功能范围是需求整理与范围确认；验收标准按里程碑逐条核对。",
+    });
+    if (!turn.hasProposal) {
+      throw new Error("The generation turn must store a candidate.");
+    }
+
+    await lockSpecWithDatabase(database, enterpriseA, {
+      projectId: version.projectId,
+      specVersionId: version.id,
+      expectedVersion: turn.projectVersion,
+    });
+
+    // The candidate is stale by now (generated before the lock moved the
+    // version), but the locked scope must be reported first. A correct
+    // expectedVersion is used so the version check alone cannot explain the
+    // SPEC_LOCKED result.
+    await expect(
+      adoptSpecProposalWithDatabase(database, enterpriseA, {
+        projectId: version.projectId,
+        sourceMessageId: turn.messageId,
+        expectedVersion: turn.projectVersion + 1,
+      }),
+    ).rejects.toMatchObject({ name: "SpecError", code: "SPEC_LOCKED" });
+
+    const history = await listProjectSpecVersionsWithDatabase(
+      database,
+      enterpriseA,
+      version.projectId,
+    );
+    expect(history?.versions).toHaveLength(1);
+  });
+
   it("keeps the interview readable but never adoptable for a late answer after locking", async () => {
     const draft = await createProjectWithDatabase(database, enterpriseA, {
       projectId: randomUUID(),

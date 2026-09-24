@@ -354,6 +354,97 @@ describe("AIPM interview boundary", () => {
     expect(after.project.version).toBe(interview.project.version);
   });
 
+  it("refuses an entire round when an odd history cannot hold a full pair, without half-writing", async () => {
+    const project = await createDraft();
+    // A provider failure stores only the USER message: the history is now odd,
+    // which is the state the off-by-one fix has to survive.
+    await expect(
+      invokeAipmWithDatabase(
+        database,
+        enterpriseA,
+        createMockAipmGateway({ failWith: { code: "UPSTREAM_TIMEOUT", message: "provider detail" } }),
+        turnInput(project.id, project.version),
+      ),
+    ).rejects.toMatchObject({ name: "AipmError", code: "PROVIDER_FAILED" });
+
+    const afterFailure = await storedPayloads(enterpriseA, project.id);
+    if (!afterFailure.sessionId) throw new Error("The failed turn must still create a session.");
+    expect(afterFailure.messages).toHaveLength(1);
+
+    // Pad the session to 39 stored rows: odd, one below the cap.
+    await admin`
+      insert into app.aipm_messages (id, session_id, sequence, role, content)
+      select gen_random_uuid(), ${afterFailure.sessionId}, g, 'USER', '填充消息'
+      from generate_series(2, 39) as g
+    `;
+
+    const before = await storedPayloads(enterpriseA, project.id);
+    expect(before.messages).toHaveLength(39);
+
+    // The round is rejected as a whole at `begin`: no USER row, no version bump.
+    await expect(
+      invokeAipmWithDatabase(
+        database,
+        enterpriseA,
+        createMockAipmGateway(),
+        turnInput(project.id, before.project.version),
+      ),
+    ).rejects.toMatchObject({ name: "AipmError", code: "MESSAGE_LIMIT_REACHED" });
+
+    const after = await storedPayloads(enterpriseA, project.id);
+    expect(after.messages).toHaveLength(39);
+    expect(after.project.version).toBe(before.project.version);
+  });
+
+  it("stores the last fitting round as a complete pair and refuses the next round entirely", async () => {
+    const project = await createDraft();
+    await invokeAipmWithDatabase(
+      database,
+      enterpriseA,
+      createMockAipmGateway(),
+      turnInput(project.id, project.version),
+    );
+
+    const interview = await storedPayloads(enterpriseA, project.id);
+    if (!interview.sessionId) throw new Error("The first turn must create a session.");
+    expect(interview.messages.map((message) => message.role)).toEqual(["USER", "ASSISTANT"]);
+
+    // 2 rows exist; pad to 38 so exactly one full round (USER + ASSISTANT) fits.
+    await admin`
+      insert into app.aipm_messages (id, session_id, sequence, role, content)
+      select gen_random_uuid(), ${interview.sessionId}, g, 'USER', '填充消息'
+      from generate_series(3, 38) as g
+    `;
+
+    const versionBefore = interview.project.version;
+    await invokeAipmWithDatabase(
+      database,
+      enterpriseA,
+      createMockAipmGateway(),
+      turnInput(project.id, versionBefore),
+    );
+
+    // The round landed as a complete pair; nothing is stranded half-way.
+    const atCap = await storedPayloads(enterpriseA, project.id);
+    expect(atCap.messages).toHaveLength(40);
+    expect(atCap.messages.map((message) => message.role).slice(-2)).toEqual(["USER", "ASSISTANT"]);
+    expect(atCap.project.version).toBe(versionBefore + 2);
+
+    // The next round is refused entirely: no USER row, no version bump.
+    await expect(
+      invokeAipmWithDatabase(
+        database,
+        enterpriseA,
+        createMockAipmGateway(),
+        turnInput(project.id, versionBefore + 2),
+      ),
+    ).rejects.toMatchObject({ name: "AipmError", code: "MESSAGE_LIMIT_REACHED" });
+
+    const after = await storedPayloads(enterpriseA, project.id);
+    expect(after.messages).toHaveLength(40);
+    expect(after.project.version).toBe(versionBefore + 2);
+  });
+
   it("stores a validated proposal that only the owner can read back", async () => {
     const project = await createDraft();
     await invokeAipmWithDatabase(

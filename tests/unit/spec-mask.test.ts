@@ -87,3 +87,43 @@ describe("recruitment masking rules", () => {
     expect(issues.join("\n")).toContain(expected);
   });
 });
+
+describe("recruitment masking issue set", () => {
+  // The two-pass comparison was restructured; the reported issue *set* must stay
+  // exactly the same, including the order the rules run in. These tests pin the
+  // full array, so any behavioural drift of the refactor fails them.
+
+  it("reports every violated rule with the same messages in the same order", () => {
+    const document = maskedDocument();
+    document.deliverables[0].id = "deliverable-renamed";
+    document.features[0].userRoleIds = [];
+    document.userFlows[0].steps = ["只剩一步"];
+    document.milestones[0].acceptanceCriteria[0].id = "criterion-renamed";
+    document.milestones[1].dueAfterDays = 12;
+    document.outOfScope = [];
+
+    expect(maskSpecIssues(validSpecDocument(), document)).toEqual([
+      "交付物的元素 ID 与顺序必须保留（第 1 项锁定为「deliverable-app」，预览为「deliverable-renamed」）。",
+      "功能「feature-intake」的使用者角色引用必须保留（锁定为 role-owner）。",
+      "流程「flow-lock」的步骤数量不能改变（锁定 3 条，预览 1 条）。",
+      "里程碑「milestone-core」的验收标准的元素 ID 与顺序必须保留（第 1 项锁定为「criterion-core-1」，预览为「criterion-renamed」）。",
+      "里程碑「milestone-accept」的 dueAfterDays 不能改变（锁定 24，预览 12）。",
+      "不做的事项的条目数量不能改变（锁定 1 条，预览 0 条）。",
+    ]);
+  });
+
+  it("skips the per-item detail checks but still reports counts when the features no longer line up", () => {
+    const document = maskedDocument();
+    // A dropped feature makes the feature list incomparable; the milestone change
+    // below must not produce a per-item issue, and the run must not crash on the
+    // shifted indices.
+    document.features = document.features.slice(0, 1);
+    document.milestones[1].dueAfterDays = 12;
+    document.outOfScope = [];
+
+    expect(maskSpecIssues(validSpecDocument(), document)).toEqual([
+      "功能的数量不能改变（锁定 2 项，预览 1 项）。",
+      "不做的事项的条目数量不能改变（锁定 1 条，预览 0 条）。",
+    ]);
+  });
+});

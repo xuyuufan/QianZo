@@ -373,6 +373,40 @@ describe("enterprise mock deposit", () => {
       `),
     ).rejects.toMatchObject({ severity: "ERROR" });
   });
+
+  it("lets two concurrent creates produce exactly one deposit with one id", async () => {
+    const fixture = await createLockedProject();
+    // A provider with no lock dance: the point here is the create race itself.
+    const provider: PaymentProvider = {
+      async createPayment() {
+        return undefined;
+      },
+    };
+
+    const results = await Promise.allSettled([
+      createEnterpriseDepositWithDatabase(database, enterpriseA, provider, {
+        projectId: fixture.project.id,
+      }),
+      createEnterpriseDepositWithDatabase(database, enterpriseA, provider, {
+        projectId: fixture.project.id,
+      }),
+    ]);
+
+    // Both callers walk away with the same payment; UNIQUE(project_id, purpose)
+    // plus the re-read under the project lock keep it to a single order.
+    expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+    const payments = results.map(
+      (result) =>
+        (result as PromiseFulfilledResult<Awaited<ReturnType<typeof createEnterpriseDepositWithDatabase>>>)
+          .value,
+    );
+    expect(payments[1].id).toBe(payments[0].id);
+    expect(payments[1].status).toBe("PENDING");
+
+    expect(await countPayments(fixture.project.id)).toBe(1);
+    // Creating a deposit is not a project state change, not even concurrently.
+    expect(await rawProjectVersion(fixture.project.id)).toBe(fixture.projectVersion + 1);
+  });
 });
 
 describe("deposit stage guards", () => {
