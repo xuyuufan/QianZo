@@ -1,8 +1,12 @@
+import "server-only";
+
 import { and, desc, eq, sql } from "drizzle-orm";
 import { assertActiveRole, type Actor } from "@/modules/identity/onboarding";
 import type { Database } from "@/platform/db/client";
 import { projects } from "@/platform/db/schema";
 
+import { ProjectError } from "./errors";
+import { withProjectLock, type ProjectLockErrors } from "./lock";
 import {
   createProjectInputSchema,
   projectIdSchema,
@@ -15,25 +19,13 @@ import {
 
 export type Project = typeof projects.$inferSelect;
 
-export type ProjectErrorCode =
-  | "NOT_FOUND"
-  | "CREATE_CONFLICT"
-  | "VERSION_CONFLICT"
-  | "SPEC_LOCKED"
-  | "INVALID_SOURCE"
-  | "INVALID_PREVIEW"
-  | "PUBLISH_CONFLICT"
-  | "INVALID_STAGE";
-
-export class ProjectError extends Error {
-  constructor(
-    public readonly code: ProjectErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ProjectError";
-  }
-}
+/** The guards shared by the draft and budget writers on an owned project. */
+const projectWriteErrors: ProjectLockErrors = {
+  notFound: () => new ProjectError("NOT_FOUND", "Project not found."),
+  specLocked: () => new ProjectError("SPEC_LOCKED", "The reviewed scope is locked."),
+  versionConflict: () =>
+    new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened."),
+};
 
 function assertEnterprise(actor: Actor) {
   assertActiveRole(actor, "ENTERPRISE");
@@ -156,49 +148,39 @@ export async function updateProjectDraftWithDatabase(
   assertEnterprise(actor);
   const input: UpdateProjectInput = updateProjectInputSchema.parse(rawInput);
 
-  return database.transaction(async (transaction) => {
-    const [current] = await transaction
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, input.projectId), eq(projects.ownerId, actor.id)))
-      .limit(1)
-      .for("update");
+  // A locked scope never changes, including the title, the original requirement
+  // and the drafts saved from an old tab; the shared lock checks that first.
+  return database.transaction((transaction) =>
+    withProjectLock(
+      transaction,
+      { projectId: input.projectId, ownerId: actor.id, expectedVersion: input.expectedVersion },
+      projectWriteErrors,
+      async () => {
+        const [updated] = await transaction
+          .update(projects)
+          .set({
+            title: input.title,
+            originalRequirement: input.originalRequirement,
+            version: sql`${projects.version} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(projects.id, input.projectId),
+              eq(projects.ownerId, actor.id),
+              eq(projects.status, "DRAFT"),
+              eq(projects.version, input.expectedVersion),
+            ),
+          )
+          .returning();
 
-    if (!current) {
-      throw new ProjectError("NOT_FOUND", "Project not found.");
-    }
-    // A locked scope never changes, including the title, the original
-    // requirement and the drafts saved from an old tab.
-    if (current.lockedSpecVersionId) {
-      throw new ProjectError("SPEC_LOCKED", "The reviewed scope is locked.");
-    }
-    if (current.version !== input.expectedVersion) {
-      throw new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened.");
-    }
-
-    const [updated] = await transaction
-      .update(projects)
-      .set({
-        title: input.title,
-        originalRequirement: input.originalRequirement,
-        version: sql`${projects.version} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(projects.id, input.projectId),
-          eq(projects.ownerId, actor.id),
-          eq(projects.status, "DRAFT"),
-          eq(projects.version, input.expectedVersion),
-        ),
-      )
-      .returning();
-
-    if (!updated) {
-      throw new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened.");
-    }
-    return updated;
-  });
+        if (!updated) {
+          throw new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened.");
+        }
+        return updated;
+      },
+    ),
+  );
 }
 
 /**
@@ -213,45 +195,35 @@ export async function saveReferenceBudgetWithDatabase(
   assertEnterprise(actor);
   const input: SaveReferenceBudgetInput = saveReferenceBudgetInputSchema.parse(rawInput);
 
-  return database.transaction(async (transaction) => {
-    const [current] = await transaction
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, input.projectId), eq(projects.ownerId, actor.id)))
-      .limit(1)
-      .for("update");
+  return database.transaction((transaction) =>
+    withProjectLock(
+      transaction,
+      { projectId: input.projectId, ownerId: actor.id, expectedVersion: input.expectedVersion },
+      projectWriteErrors,
+      async () => {
+        const [updated] = await transaction
+          .update(projects)
+          .set({
+            budgetMinMinor: input.minMinor,
+            budgetMaxMinor: input.maxMinor,
+            currency: input.currency,
+            version: sql`${projects.version} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(projects.id, input.projectId),
+              eq(projects.ownerId, actor.id),
+              eq(projects.version, input.expectedVersion),
+            ),
+          )
+          .returning();
 
-    if (!current) {
-      throw new ProjectError("NOT_FOUND", "Project not found.");
-    }
-    if (current.lockedSpecVersionId) {
-      throw new ProjectError("SPEC_LOCKED", "The reviewed scope is locked.");
-    }
-    if (current.version !== input.expectedVersion) {
-      throw new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened.");
-    }
-
-    const [updated] = await transaction
-      .update(projects)
-      .set({
-        budgetMinMinor: input.minMinor,
-        budgetMaxMinor: input.maxMinor,
-        currency: input.currency,
-        version: sql`${projects.version} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(projects.id, input.projectId),
-          eq(projects.ownerId, actor.id),
-          eq(projects.version, input.expectedVersion),
-        ),
-      )
-      .returning();
-
-    if (!updated) {
-      throw new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened.");
-    }
-    return updated;
-  });
+        if (!updated) {
+          throw new ProjectError("VERSION_CONFLICT", "The project has changed since it was opened.");
+        }
+        return updated;
+      },
+    ),
+  );
 }

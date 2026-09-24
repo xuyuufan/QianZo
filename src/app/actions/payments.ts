@@ -1,37 +1,30 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
+import { mapSharedActionError } from "@/app/actions/error-mapping";
 import type { PaymentActionState } from "@/app/actions/payment-state";
-import { IdentityError } from "@/modules/identity/onboarding";
 import { PaymentError } from "@/modules/payments/errors";
 import { describeAmount } from "@/modules/projects/money";
 import {
   createEnterpriseDeposit,
   simulatePaymentSuccess,
 } from "@/modules/payments/service";
-import { AuthenticationError, requireAuth } from "@/platform/auth/server";
+import { requireAuth } from "@/platform/auth/server";
 
 function failure(state: Omit<PaymentActionState, "successMessage">): PaymentActionState {
   return { ...state, successMessage: null };
 }
 
 function actionFailure(error: unknown): PaymentActionState {
-  if (error instanceof z.ZodError) {
-    return failure({ errorCode: "VALIDATION_ERROR", message: "请刷新页面后重试。" });
-  }
-  if (error instanceof AuthenticationError) {
-    return failure({ errorCode: "AUTHENTICATION_REQUIRED", message: "请重新登录后再操作。" });
-  }
-  if (error instanceof IdentityError) {
-    if (error.code === "ROLE_REQUIRED") {
-      return failure({ errorCode: "FORBIDDEN", message: "只有企业身份可以支付企业定金。" });
-    }
-    if (error.code === "ACTOR_DISABLED") {
-      return failure({ errorCode: "ACTOR_DISABLED", message: "账号已停用，无法继续操作。" });
-    }
-    return failure({ errorCode: "ONBOARDING_REQUIRED", message: "请先完成身份设置。" });
+  // Authentication, identity and input validation are shared across actions;
+  // only the required-role copy differs per domain.
+  const shared = mapSharedActionError(error, {
+    roleRequired: "只有企业身份可以支付企业定金。",
+    validation: { errorCode: "VALIDATION_ERROR", message: "请刷新页面后重试。" },
+  });
+  if (shared) {
+    return failure({ errorCode: shared.errorCode, message: shared.message });
   }
   if (error instanceof PaymentError) {
     switch (error.code) {

@@ -230,7 +230,9 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
                 budgetLabel={budgetLabel}
               />
             ) : (
-              <p className="form-message error" role="alert" data-error-code="PAYMENT_REQUIRED">
+              // Missing budget blocks locking, which is a spec-domain check
+              // (`SpecError("INVALID_PROPOSAL")`), not a payment requirement.
+              <p className="form-message error" role="alert" data-error-code="INVALID_PROPOSAL">
                 锁定前请先在{" "}
                 <Link href={`/enterprise/projects/${project.id}`}>项目总览</Link>{" "}
                 补齐参考预算上下限；锁定会同时冻结这些金额。

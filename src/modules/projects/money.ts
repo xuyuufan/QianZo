@@ -21,23 +21,38 @@ export function minorUnitDigits(currency: string): number {
 /**
  * Accepts plain decimal input such as `1000`, `1000.5` or `1,234.50` and returns
  * the exact number of minor units, or `null` when the input is not a valid
- * amount for the currency.
+ * amount for the currency. Thousands separators are only accepted when they
+ * form a canonical grouping: `1,234` is fine, `1,2,3` and `12,34` are rejected
+ * instead of being silently concatenated into another number.
  */
 export function parseMinorUnits(input: string, currency: string): number | null {
-  const normalized = input.trim().replaceAll(",", "");
-  if (normalized.length === 0) {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) {
     return null;
   }
 
+  // Split off the fractional part first so the integer part can be checked
+  // against the exact grouping rule below.
+  const parts = trimmed.split(".");
+  if (parts.length > 2) {
+    return null;
+  }
+  const [whole, fraction] = parts;
   const digits = minorUnitDigits(currency);
-  const pattern = digits === 0 ? /^\d+$/ : new RegExp(`^\\d+(\\.\\d{1,${digits}})?$`);
-  if (!pattern.test(normalized)) {
+
+  if (fraction !== undefined && (digits === 0 || !/^\d+$/.test(fraction) || fraction.length > digits)) {
     return null;
   }
 
-  const [whole, fraction = ""] = normalized.split(".");
-  const paddedFraction = fraction.padEnd(digits, "0");
-  const minorUnits = `${whole}${paddedFraction}`.replace(/^0+(?=\d)/, "");
+  // Either every digit with no grouping, or groups of exactly three after a
+  // 1-3 digit lead: this rejects `1,2,3`, `12,34` and `1,,2`.
+  if (!/^\d+$/.test(whole) && !/^\d{1,3}(?:,\d{3})+$/.test(whole)) {
+    return null;
+  }
+  const wholeDigits = whole.replaceAll(",", "");
+
+  const paddedFraction = (fraction ?? "").padEnd(digits, "0");
+  const minorUnits = `${wholeDigits}${paddedFraction}`.replace(/^0+(?=\d)/, "");
 
   const parsed = Number(minorUnits);
   return Number.isSafeInteger(parsed) ? parsed : null;

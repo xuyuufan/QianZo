@@ -113,6 +113,11 @@ export function PublishForm({
           {state.message}
         </p>
       ) : null}
+      {state.successMessage ? (
+        <p className="form-message success" role="status">
+          {state.successMessage}
+        </p>
+      ) : null}
       <button className="button" type="submit" disabled={pending || blocked}>
         {pending ? "正在发布…" : "确认并发布招募"}
       </button>

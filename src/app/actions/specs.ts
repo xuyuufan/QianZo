@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import type { SpecActionState } from "@/app/actions/spec-state";
-import { IdentityError } from "@/modules/identity/onboarding";
+import { mapSharedActionError } from "@/app/actions/error-mapping";
 import { specDocumentSchema } from "@/modules/specs/document";
 import { SpecError } from "@/modules/specs/errors";
 import { adoptSpecProposal, lockSpec, saveSpecVersion } from "@/modules/specs/service";
-import { AuthenticationError, requireAuth } from "@/platform/auth/server";
+import { requireAuth } from "@/platform/auth/server";
 import { describeFieldIssues } from "@/platform/validation";
 
 function failure(state: Omit<SpecActionState, "successMessage">): SpecActionState {
@@ -16,17 +16,16 @@ function failure(state: Omit<SpecActionState, "successMessage">): SpecActionStat
 }
 
 function actionFailure(error: unknown): SpecActionState {
-  if (error instanceof AuthenticationError) {
-    return failure({ errorCode: "AUTHENTICATION_REQUIRED", message: "请重新登录后再操作。", issues: [] });
-  }
-  if (error instanceof IdentityError) {
-    if (error.code === "ROLE_REQUIRED") {
-      return failure({ errorCode: "FORBIDDEN", message: "只有企业身份可以管理 Spec。", issues: [] });
-    }
-    if (error.code === "ACTOR_DISABLED") {
-      return failure({ errorCode: "ACTOR_DISABLED", message: "账号已停用，无法继续操作。", issues: [] });
-    }
-    return failure({ errorCode: "ONBOARDING_REQUIRED", message: "请先完成身份设置。", issues: [] });
+  // Authentication, identity and input validation are shared across actions;
+  // this action reports its own Zod errors with a field-level report, so it
+  // leaves `validation` unset and lets the shared mapper skip `ZodError`.
+  const shared = mapSharedActionError(error, { roleRequired: "只有企业身份可以管理 Spec。" });
+  if (shared) {
+    return failure({
+      errorCode: shared.errorCode,
+      message: shared.message,
+      issues: shared.issues ?? [],
+    });
   }
   if (error instanceof SpecError) {
     switch (error.code) {

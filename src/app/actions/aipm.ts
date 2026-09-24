@@ -1,33 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
 import type { AipmActionState } from "@/app/actions/aipm-state";
+import { mapSharedActionError } from "@/app/actions/error-mapping";
 import { AipmError } from "@/modules/aipm/errors";
 import { invokeAipm } from "@/modules/aipm/service";
-import { IdentityError } from "@/modules/identity/onboarding";
-import { AuthenticationError, requireAuth } from "@/platform/auth/server";
+import { requireAuth } from "@/platform/auth/server";
 
 function actionFailure(error: unknown): AipmActionState {
-  if (error instanceof z.ZodError) {
-    return {
+  // Authentication, identity and input validation are shared across actions;
+  // only the required-role copy differs per domain.
+  const shared = mapSharedActionError(error, {
+    roleRequired: "只有企业身份可以进行需求访谈。",
+    validation: {
       errorCode: "VALIDATION_ERROR",
       message: "请填写 1～4000 字的访谈内容；如果页面停留过久，请刷新后重试。",
-      successMessage: null,
-    };
-  }
-  if (error instanceof AuthenticationError) {
-    return { errorCode: "AUTHENTICATION_REQUIRED", message: "请重新登录后再操作。", successMessage: null };
-  }
-  if (error instanceof IdentityError) {
-    if (error.code === "ROLE_REQUIRED") {
-      return { errorCode: "FORBIDDEN", message: "只有企业身份可以进行需求访谈。", successMessage: null };
-    }
-    if (error.code === "ACTOR_DISABLED") {
-      return { errorCode: "ACTOR_DISABLED", message: "账号已停用，无法继续操作。", successMessage: null };
-    }
-    return { errorCode: "ONBOARDING_REQUIRED", message: "请先完成身份设置。", successMessage: null };
+    },
+  });
+  if (shared) {
+    return { errorCode: shared.errorCode, message: shared.message, successMessage: null };
   }
   if (error instanceof AipmError) {
     switch (error.code) {

@@ -13,8 +13,14 @@ import { AipmError } from "./errors";
 export const AIPM_CONTRACT_VERSION = "1";
 
 export const aipmLimits = {
-  /** Also caps a session: the request carries the whole transcript. */
+  /** Caps the messages in a single request transcript. */
   messagesPerRequest: 40,
+  /**
+   * Caps the total rows stored for one interview session (USER + ASSISTANT).
+   * Separate from `messagesPerRequest` on purpose: a request transcript and the
+   * persisted session are different things, so the two limits must not drift.
+   */
+  sessionMessages: 40,
   userMessageLength: 4_000,
   instructionLength: 2_000,
   assistantMessageLength: 8_000,
@@ -139,9 +145,9 @@ export function parseAipmResponse(request: AipmRequest, rawResponse: unknown): A
     throw new AipmError("INVALID_RESPONSE", "The AIPM response did not match the contract.");
   }
 
-  if (response.data.contractVersion !== request.contractVersion) {
-    throw new AipmError("CONTRACT_MISMATCH", "The AIPM response reported another contract version.");
-  }
+  // Both directions use `z.literal(AIPM_CONTRACT_VERSION)`, so a response with a
+  // different contract version already failed schema parsing above; there is no
+  // separate version comparison to run here. Only the correlation id is left.
   if (response.data.invocationId !== request.invocationId) {
     throw new AipmError("CONTRACT_MISMATCH", "The AIPM response did not match the invocation.");
   }

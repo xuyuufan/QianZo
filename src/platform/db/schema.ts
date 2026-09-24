@@ -73,6 +73,10 @@ export const projects = appSchema.table(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  // The constraint text below mirrors `supabase/migrations/*` for typing and
+  // query building only: the migration files are the single source of truth for
+  // the real DDL. This repo has no drizzle-kit config, so nothing here generates
+  // or changes migrations.
   (table) => [
     check(
       "projects_title_check",
@@ -82,7 +86,7 @@ export const projects = appSchema.table(
       "projects_original_requirement_check",
       sql`char_length(${table.originalRequirement}) between 0 and 10000`,
     ),
-    check("projects_status_check", sql`${table.status} = 'DRAFT'`),
+    check("projects_status_check", sql`${table.status} in ('DRAFT', 'OPEN')`),
     check("projects_version_check", sql`${table.version} > 0`),
     index("projects_owner_created_at_idx").on(table.ownerId, table.createdAt.desc()),
   ],

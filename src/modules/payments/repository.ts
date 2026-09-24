@@ -1,8 +1,11 @@
+import "server-only";
+
 import { randomUUID } from "node:crypto";
 
 import { and, eq, sql } from "drizzle-orm";
 
 import { assertActiveRole, type Actor } from "@/modules/identity/onboarding";
+import { withProjectLock } from "@/modules/projects/lock";
 import { projectIdSchema } from "@/modules/projects/validation";
 import type { Database } from "@/platform/db/client";
 import { payments, projects } from "@/platform/db/schema";
@@ -80,59 +83,56 @@ export async function createEnterpriseDepositWithDatabase(
     currency: enterpriseDeposit.currency,
   });
 
-  return database.transaction(async (transaction) => {
-    const [project] = await transaction
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, input.projectId), eq(projects.ownerId, actor.id)))
-      .limit(1)
-      .for("update");
-    if (!project) {
-      throw new PaymentError("NOT_FOUND", "Project not found.");
-    }
+  return database.transaction((transaction) =>
+    withProjectLock(
+      transaction,
+      { projectId: input.projectId, ownerId: actor.id },
+      { notFound: () => new PaymentError("NOT_FOUND", "Project not found.") },
+      async (project) => {
+        // A concurrent create may have won the unique constraint while the
+        // provider was being called; that payment is the one this project has.
+        const [current] = await transaction
+          .select()
+          .from(payments)
+          .where(
+            and(eq(payments.projectId, project.id), eq(payments.purpose, enterpriseDeposit.purpose)),
+          )
+          .limit(1);
+        if (current) {
+          return current;
+        }
 
-    // A concurrent create may have won the unique constraint while the provider
-    // was being called; that payment is the one this project has.
-    const [current] = await transaction
-      .select()
-      .from(payments)
-      .where(
-        and(eq(payments.projectId, project.id), eq(payments.purpose, enterpriseDeposit.purpose)),
-      )
-      .limit(1);
-    if (current) {
-      return current;
-    }
+        assertDepositPreconditions(project);
 
-    assertDepositPreconditions(project);
+        // Column-scoped INSERT keeps the runtime role from choosing status,
+        // timestamps or a different amount.
+        await transaction.execute(sql`
+          insert into app.payments (id, project_id, payer_id, purpose, amount_minor, currency)
+          values (
+            ${paymentId},
+            ${project.id},
+            ${actor.id},
+            ${enterpriseDeposit.purpose},
+            ${enterpriseDeposit.amountMinor},
+            ${enterpriseDeposit.currency}
+          )
+          on conflict (project_id, purpose) do nothing
+        `);
 
-    // Column-scoped INSERT keeps the runtime role from choosing status,
-    // timestamps or a different amount.
-    await transaction.execute(sql`
-      insert into app.payments (id, project_id, payer_id, purpose, amount_minor, currency)
-      values (
-        ${paymentId},
-        ${project.id},
-        ${actor.id},
-        ${enterpriseDeposit.purpose},
-        ${enterpriseDeposit.amountMinor},
-        ${enterpriseDeposit.currency}
-      )
-      on conflict (project_id, purpose) do nothing
-    `);
-
-    const [inserted] = await transaction
-      .select()
-      .from(payments)
-      .where(
-        and(eq(payments.projectId, project.id), eq(payments.purpose, enterpriseDeposit.purpose)),
-      )
-      .limit(1);
-    if (!inserted) {
-      throw new Error("The enterprise deposit could not be recorded.");
-    }
-    return inserted;
-  });
+        const [inserted] = await transaction
+          .select()
+          .from(payments)
+          .where(
+            and(eq(payments.projectId, project.id), eq(payments.purpose, enterpriseDeposit.purpose)),
+          )
+          .limit(1);
+        if (!inserted) {
+          throw new Error("The enterprise deposit could not be recorded.");
+        }
+        return inserted;
+      },
+    ),
+  );
 }
 
 /**
@@ -159,57 +159,54 @@ export async function simulatePaymentSuccessWithDatabase(
     }
 
     // The project lock always comes first, then the payment row.
-    const [project] = await transaction
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, found.projectId), eq(projects.ownerId, actor.id)))
-      .limit(1)
-      .for("update");
-    if (!project) {
-      throw new PaymentError("NOT_FOUND", "Payment not found.");
-    }
+    return withProjectLock(
+      transaction,
+      { projectId: found.projectId, ownerId: actor.id },
+      { notFound: () => new PaymentError("NOT_FOUND", "Payment not found.") },
+      async (project) => {
+        const [payment] = await transaction
+          .select()
+          .from(payments)
+          .where(eq(payments.id, input.paymentId))
+          .limit(1)
+          .for("update");
+        if (
+          !payment ||
+          payment.payerId !== actor.id ||
+          payment.purpose !== enterpriseDeposit.purpose
+        ) {
+          throw new PaymentError("NOT_FOUND", "Payment not found.");
+        }
 
-    const [payment] = await transaction
-      .select()
-      .from(payments)
-      .where(eq(payments.id, input.paymentId))
-      .limit(1)
-      .for("update");
-    if (
-      !payment ||
-      payment.payerId !== actor.id ||
-      payment.purpose !== enterpriseDeposit.purpose
-    ) {
-      throw new PaymentError("NOT_FOUND", "Payment not found.");
-    }
+        if (payment.status === "SUCCEEDED") {
+          return payment;
+        }
 
-    if (payment.status === "SUCCEEDED") {
-      return payment;
-    }
+        assertDepositPreconditions(project);
 
-    assertDepositPreconditions(project);
+        await transaction.execute(sql`
+          update app.payments
+          set status = 'SUCCEEDED', succeeded_at = now(), updated_at = now()
+          where id = ${payment.id} and status = 'PENDING'
+        `);
+        // A successful deposit is a project change: the version token moves on.
+        await transaction.execute(sql`
+          update app.projects
+          set version = version + 1, updated_at = now()
+          where id = ${project.id} and owner_id = ${actor.id}
+        `);
 
-    await transaction.execute(sql`
-      update app.payments
-      set status = 'SUCCEEDED', succeeded_at = now(), updated_at = now()
-      where id = ${payment.id} and status = 'PENDING'
-    `);
-    // A successful deposit is a project change: the version token moves on.
-    await transaction.execute(sql`
-      update app.projects
-      set version = version + 1, updated_at = now()
-      where id = ${project.id} and owner_id = ${actor.id}
-    `);
-
-    const [updated] = await transaction
-      .select()
-      .from(payments)
-      .where(eq(payments.id, payment.id))
-      .limit(1);
-    if (!updated) {
-      throw new Error("The simulated payment could not be read back.");
-    }
-    return updated;
+        const [updated] = await transaction
+          .select()
+          .from(payments)
+          .where(eq(payments.id, payment.id))
+          .limit(1);
+        if (!updated) {
+          throw new Error("The simulated payment could not be read back.");
+        }
+        return updated;
+      },
+    );
   });
 }
 

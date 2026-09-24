@@ -3,37 +3,64 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { mapSharedActionError } from "@/app/actions/error-mapping";
 import type { ProjectActionState } from "@/app/actions/project-state";
-import { IdentityError } from "@/modules/identity/onboarding";
 import { PaymentError } from "@/modules/payments/errors";
-import { ProjectError } from "@/modules/projects/repository";
+import { ProjectError } from "@/modules/projects/errors";
 import { publishProject } from "@/modules/projects/service";
 import { specDocumentSchema } from "@/modules/specs/document";
-import { AuthenticationError, requireAuth } from "@/platform/auth/server";
+import { requireAuth } from "@/platform/auth/server";
 import { describeFieldIssues } from "@/platform/validation";
 
-function failure(state: Omit<ProjectActionState, "issues"> & { issues?: string[] }): ProjectActionState {
-  return { issues: [], ...state };
+function failure(
+  state: Omit<ProjectActionState, "issues" | "successMessage"> & {
+    issues?: string[];
+    successMessage?: string | null;
+  },
+): ProjectActionState {
+  return { issues: [], successMessage: null, ...state };
 }
 
-function actionFailure(error: unknown): ProjectActionState {
-  if (error instanceof z.ZodError) {
+/** True when the only reason an input failed to parse is the confirmation box. */
+function isConfirmationIssue(issue: { path: readonly PropertyKey[] }): boolean {
+  return issue.path.length === 1 && issue.path[0] === "confirmed";
+}
+
+/**
+ * A missing or unchecked confirmation is its own message ("please tick the
+ * box"); any other field problem (a bad version, an unknown key, ...) is
+ * reported field by field instead of being mislabelled as a missing
+ * confirmation.
+ */
+function publishValidationFailure(error: z.ZodError): ProjectActionState {
+  const onlyConfirmationProblem = error.issues.length > 0 && error.issues.every(isConfirmationIssue);
+  if (onlyConfirmationProblem) {
     return failure({
       errorCode: "CONFIRMATION_REQUIRED",
       message: "发布前需要勾选“我已确认这是最终预览”。",
     });
   }
-  if (error instanceof AuthenticationError) {
-    return failure({ errorCode: "AUTHENTICATION_REQUIRED", message: "请重新登录后再操作。" });
+  return failure({
+    errorCode: "INVALID_INPUT",
+    message: "发布信息未通过校验，请修正下列问题后重试。",
+    issues: describeFieldIssues(error),
+  });
+}
+
+function actionFailure(error: unknown): ProjectActionState {
+  // Authentication and identity are shared across actions; only the
+  // required-role copy differs per domain. Zod errors are handled below with a
+  // confirmation-specific message, so `validation` is left unset here.
+  const shared = mapSharedActionError(error, { roleRequired: "只有企业身份可以发布项目。" });
+  if (shared) {
+    return failure({
+      errorCode: shared.errorCode,
+      message: shared.message,
+      issues: shared.issues ?? [],
+    });
   }
-  if (error instanceof IdentityError) {
-    if (error.code === "ROLE_REQUIRED") {
-      return failure({ errorCode: "FORBIDDEN", message: "只有企业身份可以发布项目。" });
-    }
-    if (error.code === "ACTOR_DISABLED") {
-      return failure({ errorCode: "ACTOR_DISABLED", message: "账号已停用，无法继续操作。" });
-    }
-    return failure({ errorCode: "ONBOARDING_REQUIRED", message: "请先完成身份设置。" });
+  if (error instanceof z.ZodError) {
+    return publishValidationFailure(error);
   }
   if (error instanceof PaymentError) {
     if (error.code === "PAYMENT_REQUIRED") {
@@ -132,6 +159,8 @@ export async function publishProjectAction(
 
   return failure({
     errorCode: null,
-    message: "已发布：招募视图对已登录用户可见，项目状态为 OPEN。S1 不提供下架或修改已公开内容。",
+    message: null,
+    successMessage:
+      "已发布：招募视图对已登录用户可见，项目状态为 OPEN。S1 不提供下架或修改已公开内容。",
   });
 }

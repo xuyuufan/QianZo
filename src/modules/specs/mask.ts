@@ -5,75 +5,82 @@ import { specDocumentSchema, type SpecDocumentV1 } from "./document";
  * replace human-readable text. Structure, ids, references, item counts,
  * milestone order and delivery days must survive, so masking can never quietly
  * drop an obligation or shorten the promised timeline.
+ *
+ * Every list is compared with the same two passes: first its ids and order,
+ * then — only when the ids still line up — the detail of each item. Running the
+ * id/order pass first is what makes the per-item pass safe: an item comparator
+ * never indexes into a list whose length or ordering already changed.
  */
 export function maskSpecIssues(locked: SpecDocumentV1, masked: SpecDocumentV1): string[] {
   const issues: string[] = [];
 
+  // Pass one: ids, order and length of every list.
   compareIdSequence(issues, "使用者角色", locked.userRoles, masked.userRoles);
   compareIdSequence(issues, "集成", locked.integrations, masked.integrations);
-
-  // Per-item rules only run when the item counts still match; a shorter list is
-  // already reported as a structure change.
   const featuresComparable = compareIdSequence(issues, "功能", locked.features, masked.features);
   const pagesComparable = compareIdSequence(issues, "页面", locked.pages, masked.pages);
   const flowsComparable = compareIdSequence(issues, "流程", locked.userFlows, masked.userFlows);
   compareIdSequence(issues, "交付物", locked.deliverables, masked.deliverables);
   const milestonesComparable = compareIdSequence(issues, "里程碑", locked.milestones, masked.milestones);
 
-  if (!featuresComparable) {
-    compareTextListCount(issues, "技术约束", locked.technicalConstraints, masked.technicalConstraints);
-    compareTextListCount(issues, "不做的事项", locked.outOfScope, masked.outOfScope);
-    compareTextListCount(issues, "假设", locked.assumptions, masked.assumptions);
-    return issues;
+  // Pass two: per-item detail. The feature list gates the whole block, because
+  // every other item refers back to a feature; when the feature list itself no
+  // longer lines up there is no stable structure left to compare against.
+  if (featuresComparable) {
+    compareEachItem(locked.features, masked.features, (feature, maskedFeature) => {
+      compareReferenceList(
+        issues,
+        `功能「${feature.id}」的使用者角色引用`,
+        feature.userRoleIds,
+        maskedFeature.userRoleIds,
+      );
+    });
+
+    if (pagesComparable) {
+      compareEachItem(locked.pages, masked.pages, (page, maskedPage) => {
+        compareReferenceList(
+          issues,
+          `页面「${page.id}」的功能引用`,
+          page.featureIds,
+          maskedPage.featureIds,
+        );
+      });
+    }
+
+    if (flowsComparable) {
+      compareEachItem(locked.userFlows, masked.userFlows, (flow, maskedFlow) => {
+        if (flow.steps.length !== maskedFlow.steps.length) {
+          issues.push(
+            `流程「${flow.id}」的步骤数量不能改变（锁定 ${flow.steps.length} 条，预览 ${maskedFlow.steps.length} 条）。`,
+          );
+        }
+      });
+    }
+
+    if (milestonesComparable) {
+      compareEachItem(locked.milestones, masked.milestones, (milestone, maskedMilestone) => {
+        compareReferenceList(
+          issues,
+          `里程碑「${milestone.id}」的交付物引用`,
+          milestone.deliverableIds,
+          maskedMilestone.deliverableIds,
+        );
+        if (milestone.dueAfterDays !== maskedMilestone.dueAfterDays) {
+          issues.push(
+            `里程碑「${milestone.id}」的 dueAfterDays 不能改变（锁定 ${milestone.dueAfterDays}，预览 ${maskedMilestone.dueAfterDays}）。`,
+          );
+        }
+        compareIdSequence(
+          issues,
+          `里程碑「${milestone.id}」的验收标准`,
+          milestone.acceptanceCriteria,
+          maskedMilestone.acceptanceCriteria,
+        );
+      });
+    }
   }
 
-  locked.features.forEach((feature, index) => {
-    compareReferenceList(
-      issues,
-      `功能「${feature.id}」的使用者角色引用`,
-      feature.userRoleIds,
-      masked.features[index].userRoleIds,
-    );
-  });
-
-  if (pagesComparable) locked.pages.forEach((page, index) => {
-    compareReferenceList(
-      issues,
-      `页面「${page.id}」的功能引用`,
-      page.featureIds,
-      masked.pages[index].featureIds,
-    );
-  });
-
-  if (flowsComparable) locked.userFlows.forEach((flow, index) => {
-    if (flow.steps.length !== masked.userFlows[index].steps.length) {
-      issues.push(
-        `流程「${flow.id}」的步骤数量不能改变（锁定 ${flow.steps.length} 条，预览 ${masked.userFlows[index].steps.length} 条）。`,
-      );
-    }
-  });
-
-  if (milestonesComparable) locked.milestones.forEach((milestone, index) => {
-    const maskedMilestone = masked.milestones[index];
-    compareReferenceList(
-      issues,
-      `里程碑「${milestone.id}」的交付物引用`,
-      milestone.deliverableIds,
-      maskedMilestone.deliverableIds,
-    );
-    if (milestone.dueAfterDays !== maskedMilestone.dueAfterDays) {
-      issues.push(
-        `里程碑「${milestone.id}」的 dueAfterDays 不能改变（锁定 ${milestone.dueAfterDays}，预览 ${maskedMilestone.dueAfterDays}）。`,
-      );
-    }
-    compareIdSequence(
-      issues,
-      `里程碑「${milestone.id}」的验收标准`,
-      milestone.acceptanceCriteria,
-      maskedMilestone.acceptanceCriteria,
-    );
-  });
-
+  // Free-text lists carry no ids; only their item count is comparable.
   compareTextListCount(issues, "技术约束", locked.technicalConstraints, masked.technicalConstraints);
   compareTextListCount(issues, "不做的事项", locked.outOfScope, masked.outOfScope);
   compareTextListCount(issues, "假设", locked.assumptions, masked.assumptions);
@@ -86,11 +93,17 @@ export function parseMaskedSpecDocument(raw: unknown) {
   return specDocumentSchema.safeParse(raw);
 }
 
+type IdItem = { id: string };
+
+/**
+ * Compares the ids and order of two lists of the same length. Returns whether
+ * the lists are comparable, i.e. whether a per-item pass may run.
+ */
 function compareIdSequence(
   issues: string[],
   label: string,
-  locked: Array<{ id: string }>,
-  masked: Array<{ id: string }>,
+  locked: IdItem[],
+  masked: IdItem[],
 ): boolean {
   if (locked.length !== masked.length) {
     issues.push(`${label}的数量不能改变（锁定 ${locked.length} 项，预览 ${masked.length} 项）。`);
@@ -104,6 +117,19 @@ function compareIdSequence(
     }
   });
   return true;
+}
+
+/**
+ * Runs `compareItem` for every position of two equal-length lists. Callers only
+ * reach this after `compareIdSequence` proved the lengths match, so the pairing
+ * by index is safe.
+ */
+function compareEachItem<T>(
+  locked: T[],
+  masked: T[],
+  compareItem: (lockedItem: T, maskedItem: T) => void,
+): void {
+  locked.forEach((item, index) => compareItem(item, masked[index]));
 }
 
 function compareReferenceList(

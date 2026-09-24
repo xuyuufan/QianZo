@@ -242,7 +242,7 @@ corepack pnpm build
 corepack pnpm test:e2e
 ```
 
-build 与 E2E 顺序执行，避免争用 .next；遵循 README 的 pnpm PATH 与现有开发服务复用说明。S1 应新增实际单元用例，不把 passWithNoTests 当作校验器验收。Slice 整体验收还需验证本地生产构建启动及受保护页面行为；缺少环境时记录未运行项，不用内存数据库替代。
+E2E 的 `webServer.command` 为 `corepack pnpm build && corepack pnpm start`，会在 300 秒超时内自行完成生产构建并启动生产服务后再跑用例，全新环境不必手动先 `build`、`start`。`next dev` 冷启动会为第一个用例现场编译 Server Action 并造成假失败，因此不复用 dev 服务。命令统一写作 `corepack pnpm ...`（本机 `pnpm` 不在 PATH，corepack 随 Node 24 提供且就在 PATH 上），与根 README 一致。S1 已新增实际单元用例，不把 passWithNoTests 当作校验器验收。Slice 整体验收还需验证本地生产构建启动及受保护页面行为；缺少环境时记录未运行项，不用内存数据库替代。
 
 ## 10. 演示与交付
 
@@ -262,4 +262,4 @@ S1 已于 2026-09-24 按上述六个任务实施完成，实施顺序、每个�
 
 - `ON DELETE RESTRICT` 无法被 `DEFERRABLE` 延迟检查，因此 `projects` 指向 `spec_versions` 的两个复合外键改为 `NO ACTION + DEFERRABLE INITIALLY DEFERRED`，使带历史的项目能在同一事务内删除；其余外键保持 `RESTRICT`。
 - 空库重建的验证在独立 scratch 数据库上完成，仅用最小 `auth.users` 桩件替代 Supabase 平台对象；`supabase db reset --local` 未执行，以遵守「不擅自清空用户本地草稿」。
-- E2E 对 `pnpm start` 的生产构建运行：`next dev` 冷启动会现场编译 Server Action 并造成首个用例假失败，生产服务无此抖动。
+- E2E 对生产构建运行：`playwright.config.ts` 的 `webServer.command` 为 `corepack pnpm build && corepack pnpm start`，能在全新环境自行构建并启动生产服务；`next dev` 冷启动会现场编译 Server Action 并造成首个用例假失败，生产服务无此抖动。本机非 CI 环境仍保留 `reuseExistingServer`，可复用已运行的服务。

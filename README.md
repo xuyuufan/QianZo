@@ -99,17 +99,15 @@ corepack pnpm typecheck
 corepack pnpm lint
 corepack pnpm test
 corepack pnpm test:integration
-corepack pnpm build
 corepack pnpm test:e2e
-corepack pnpm start
 ```
 
 集成测试连接真实本地 PostgreSQL、Supabase Auth 和 Data API；E2E 使用真实登录 cookie 及独立浏览器 context，不以固定用户 mock 授权。
 
 三点注意：
 
-- **建议顺序是 `build` → `start` → `test:e2e`**：`next dev` 冷启动会为第一个用例现场编译 Server Action，可能超出用例超时造成假失败；对生产构建运行没有这个抖动（本机 5 个 E2E 约 45 秒）。
-- `test:e2e` 的 `webServer` 命令是 `pnpm dev`，但配置中 `reuseExistingServer` 为 true：只要 <http://127.0.0.1:3000> 已有服务（`dev` 或 `start`）就会直接复用。若 PATH 中没有 `pnpm` 且没有已运行的服务，Playwright 无法自行拉起服务。
+- **E2E 对生产构建运行**：`test:e2e` 的 `webServer.command` 是 `corepack pnpm build && corepack pnpm start`，会在 `timeout: 300_000` 内自行完成生产构建并启动服务，全新环境不必手动 `build`/`start`。之所以不复用 `next dev`：dev 冷启动会为第一个用例现场编译 Server Action，可能超出用例超时造成假失败；对生产构建运行没有这个抖动（本机 5 个 E2E 约 45 秒）。
+- `reuseExistingServer` 在本机（非 CI）为 true：只要 <http://127.0.0.1:3000> 已有服务（`dev` 或 `start`）就会直接复用而不重新构建；若希望强制对全新生产构建运行，先停掉 3000 端口的服务再执行。命令统一写作 `corepack pnpm ...`（本机 `pnpm` 不在 PATH，corepack 随 Node 24 提供且就在 PATH 上）。
 - `build` 与 `test:e2e` 会重建 `.next/` 与 `test-results/`，属正常清理；`build` 后根目录不会产生 `tsconfig.tsbuildinfo`（已重定向到 `.next/cache/`）。
 
 ## 仅重建本地合成数据库

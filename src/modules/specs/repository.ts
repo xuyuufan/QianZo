@@ -1,9 +1,12 @@
+import "server-only";
+
 import { randomUUID } from "node:crypto";
 
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { aipmPayloadSchema } from "@/modules/aipm/contract";
 import { assertActiveRole, type Actor } from "@/modules/identity/onboarding";
+import { withProjectLock } from "@/modules/projects/lock";
 import { projectIdSchema } from "@/modules/projects/validation";
 import type { Database } from "@/platform/db/client";
 import { aipmMessages, aipmSessions, projects, specVersions } from "@/platform/db/schema";
@@ -141,71 +144,67 @@ export async function adoptSpecProposalWithDatabase(
   assertActiveRole(actor, "ENTERPRISE");
   const input = adoptSpecProposalInputSchema.parse(rawInput);
 
-  return database.transaction(async (transaction) => {
-    const [project] = await transaction
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, input.projectId), eq(projects.ownerId, actor.id)))
-      .limit(1)
-      .for("update");
+  return database.transaction((transaction) =>
+    withProjectLock(
+      transaction,
+      { projectId: input.projectId, ownerId: actor.id },
+      {
+        notFound: () => new SpecError("NOT_FOUND", "Project not found."),
+        specLocked: () => new SpecError("SPEC_LOCKED", "The reviewed scope is locked."),
+      },
+      async (project) => {
+        // The source must be an assistant message of this project's own session.
+        const [candidate] = await transaction
+          .select({ message: aipmMessages })
+          .from(aipmMessages)
+          .innerJoin(aipmSessions, eq(aipmMessages.sessionId, aipmSessions.id))
+          .where(
+            and(eq(aipmMessages.id, input.sourceMessageId), eq(aipmSessions.projectId, project.id)),
+          )
+          .limit(1);
 
-    if (!project) {
-      throw new SpecError("NOT_FOUND", "Project not found.");
-    }
-    if (project.lockedSpecVersionId) {
-      throw new SpecError("SPEC_LOCKED", "The reviewed scope is locked.");
-    }
+        if (!candidate || candidate.message.role !== "ASSISTANT") {
+          throw new SpecError("INVALID_PROPOSAL", "The source message is not a candidate of this project.");
+        }
 
-    // The source must be an assistant message of this project's own session.
-    const [candidate] = await transaction
-      .select({ message: aipmMessages })
-      .from(aipmMessages)
-      .innerJoin(aipmSessions, eq(aipmMessages.sessionId, aipmSessions.id))
-      .where(
-        and(eq(aipmMessages.id, input.sourceMessageId), eq(aipmSessions.projectId, project.id)),
-      )
-      .limit(1);
+        const payload = aipmPayloadSchema.safeParse(candidate.message.payload).data ?? null;
+        const document = payload?.result.specProposal ?? null;
+        if (!payload || !document) {
+          throw new SpecError("INVALID_PROPOSAL", "The source message holds no usable spec proposal.");
+        }
 
-    if (!candidate || candidate.message.role !== "ASSISTANT") {
-      throw new SpecError("INVALID_PROPOSAL", "The source message is not a candidate of this project.");
-    }
+        // Replaying the same adoption returns the version created the first time
+        // instead of appending a second one.
+        const [existing] = await transaction
+          .select()
+          .from(specVersions)
+          .where(eq(specVersions.sourceMessageId, input.sourceMessageId))
+          .limit(1);
+        if (existing) {
+          return toStoredSpecVersion(existing);
+        }
 
-    const payload = aipmPayloadSchema.safeParse(candidate.message.payload).data ?? null;
-    const document = payload?.result.specProposal ?? null;
-    if (!payload || !document) {
-      throw new SpecError("INVALID_PROPOSAL", "The source message holds no usable spec proposal.");
-    }
+        if (project.version !== input.expectedVersion) {
+          throw new SpecError("VERSION_CONFLICT", "The project has changed since it was opened.");
+        }
+        if (payload.adoptableProjectVersion !== project.version) {
+          throw new SpecError(
+            "STALE_PROPOSAL",
+            "The candidate was generated from an earlier version of the project.",
+          );
+        }
 
-    // Replaying the same adoption returns the version created the first time
-    // instead of appending a second one.
-    const [existing] = await transaction
-      .select()
-      .from(specVersions)
-      .where(eq(specVersions.sourceMessageId, input.sourceMessageId))
-      .limit(1);
-    if (existing) {
-      return toStoredSpecVersion(existing);
-    }
-
-    if (project.version !== input.expectedVersion) {
-      throw new SpecError("VERSION_CONFLICT", "The project has changed since it was opened.");
-    }
-    if (payload.adoptableProjectVersion !== project.version) {
-      throw new SpecError(
-        "STALE_PROPOSAL",
-        "The candidate was generated from an earlier version of the project.",
-      );
-    }
-
-    const version = await insertSpecVersion(transaction, {
-      projectId: project.id,
-      createdBy: actor.id,
-      sourceMessageId: input.sourceMessageId,
-      document,
-    });
-    await moveCurrentPointer(transaction, project.id, version.id);
-    return version;
-  });
+        const version = await insertSpecVersion(transaction, {
+          projectId: project.id,
+          createdBy: actor.id,
+          sourceMessageId: input.sourceMessageId,
+          document,
+        });
+        await moveCurrentPointer(transaction, project.id, version.id);
+        return version;
+      },
+    ),
+  );
 }
 
 /** Manual review always appends a new version; it never rewrites history. */
@@ -217,34 +216,29 @@ export async function saveSpecVersionWithDatabase(
   assertActiveRole(actor, "ENTERPRISE");
   const input = saveSpecVersionInputSchema.parse(rawInput);
 
-  return database.transaction(async (transaction) => {
-    const [project] = await transaction
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, input.projectId), eq(projects.ownerId, actor.id)))
-      .limit(1)
-      .for("update");
-
-    if (!project) {
-      throw new SpecError("NOT_FOUND", "Project not found.");
-    }
-    if (project.lockedSpecVersionId) {
-      throw new SpecError("SPEC_LOCKED", "The reviewed scope is locked.");
-    }
-    if (project.version !== input.expectedVersion) {
-      throw new SpecError("VERSION_CONFLICT", "The project has changed since it was opened.");
-    }
-
-    const version = await insertSpecVersion(transaction, {
-      projectId: project.id,
-      createdBy: actor.id,
-      // A manual save is not an adoption of an existing candidate.
-      sourceMessageId: null,
-      document: input.document,
-    });
-    await moveCurrentPointer(transaction, project.id, version.id);
-    return version;
-  });
+  return database.transaction((transaction) =>
+    withProjectLock(
+      transaction,
+      { projectId: input.projectId, ownerId: actor.id, expectedVersion: input.expectedVersion },
+      {
+        notFound: () => new SpecError("NOT_FOUND", "Project not found."),
+        specLocked: () => new SpecError("SPEC_LOCKED", "The reviewed scope is locked."),
+        versionConflict: () =>
+          new SpecError("VERSION_CONFLICT", "The project has changed since it was opened."),
+      },
+      async (project) => {
+        const version = await insertSpecVersion(transaction, {
+          projectId: project.id,
+          createdBy: actor.id,
+          // A manual save is not an adoption of an existing candidate.
+          sourceMessageId: null,
+          document: input.document,
+        });
+        await moveCurrentPointer(transaction, project.id, version.id);
+        return version;
+      },
+    ),
+  );
 }
 
 /**
@@ -259,61 +253,57 @@ export async function lockSpecWithDatabase(
   assertActiveRole(actor, "ENTERPRISE");
   const input = lockSpecInputSchema.parse(rawInput);
 
-  return database.transaction(async (transaction) => {
-    const [project] = await transaction
-      .select()
-      .from(projects)
-      .where(and(eq(projects.id, input.projectId), eq(projects.ownerId, actor.id)))
-      .limit(1)
-      .for("update");
+  return database.transaction((transaction) =>
+    withProjectLock(
+      transaction,
+      { projectId: input.projectId, ownerId: actor.id },
+      { notFound: () => new SpecError("NOT_FOUND", "Project not found.") },
+      async (project) => {
+        const [current] = project.currentSpecVersionId
+          ? await transaction
+              .select()
+              .from(specVersions)
+              .where(
+                and(
+                  eq(specVersions.id, project.currentSpecVersionId),
+                  eq(specVersions.projectId, project.id),
+                ),
+              )
+              .limit(1)
+          : [];
 
-    if (!project) {
-      throw new SpecError("NOT_FOUND", "Project not found.");
-    }
+        if (!current) {
+          throw new SpecError("INVALID_PROPOSAL", "There is no saved version to lock.");
+        }
 
-    const [current] = project.currentSpecVersionId
-      ? await transaction
-          .select()
-          .from(specVersions)
-          .where(
-            and(
-              eq(specVersions.id, project.currentSpecVersionId),
-              eq(specVersions.projectId, project.id),
-            ),
-          )
-          .limit(1)
-      : [];
+        // Replaying the same confirmation returns the already locked version.
+        if (project.lockedSpecVersionId === current.id) {
+          return toStoredSpecVersion(current);
+        }
+        if (project.lockedSpecVersionId) {
+          throw new SpecError("SPEC_LOCKED", "The reviewed scope is locked.");
+        }
+        if (input.specVersionId !== current.id) {
+          throw new SpecError("INVALID_PROPOSAL", "Only the current saved version can be locked.");
+        }
+        if (project.version !== input.expectedVersion) {
+          throw new SpecError("VERSION_CONFLICT", "The project has changed since it was opened.");
+        }
+        if (project.budgetMinMinor === null || project.budgetMaxMinor === null || !project.currency) {
+          throw new SpecError("INVALID_PROPOSAL", "A complete reference budget is required before locking.");
+        }
 
-    if (!current) {
-      throw new SpecError("INVALID_PROPOSAL", "There is no saved version to lock.");
-    }
+        await transaction.execute(sql`
+          update app.projects
+          set locked_spec_version_id = ${current.id}, locked_at = now(),
+            version = version + 1, updated_at = now()
+          where id = ${project.id} and owner_id = ${actor.id}
+        `);
 
-    // Replaying the same confirmation returns the already locked version.
-    if (project.lockedSpecVersionId === current.id) {
-      return toStoredSpecVersion(current);
-    }
-    if (project.lockedSpecVersionId) {
-      throw new SpecError("SPEC_LOCKED", "The reviewed scope is locked.");
-    }
-    if (input.specVersionId !== current.id) {
-      throw new SpecError("INVALID_PROPOSAL", "Only the current saved version can be locked.");
-    }
-    if (project.version !== input.expectedVersion) {
-      throw new SpecError("VERSION_CONFLICT", "The project has changed since it was opened.");
-    }
-    if (project.budgetMinMinor === null || project.budgetMaxMinor === null || !project.currency) {
-      throw new SpecError("INVALID_PROPOSAL", "A complete reference budget is required before locking.");
-    }
-
-    await transaction.execute(sql`
-      update app.projects
-      set locked_spec_version_id = ${current.id}, locked_at = now(),
-        version = version + 1, updated_at = now()
-      where id = ${project.id} and owner_id = ${actor.id}
-    `);
-
-    return toStoredSpecVersion(current);
-  });
+        return toStoredSpecVersion(current);
+      },
+    ),
+  );
 }
 
 /** Private history view; another enterprise or a builder gets "not found". */
