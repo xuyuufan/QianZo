@@ -1,8 +1,8 @@
 # Qianzo 项目状态
 
-更新时间：2026-09-24（S1 完成本地实现与验收；S0 历史见文末基线章节）
+更新时间：2026-09-24（S1 完成本地实现与验收，并完成一轮代码质检修复；S0 历史见文末基线章节）
 
-当前分支：`feat/s1-spec-publish`（从包含 S0 的 `origin/main` 建立，领先 6 个提交，**尚未推送**）
+当前分支：`feat/s1-spec-publish`（从包含 S0 的 `origin/main` 建立，本地领先 10 个提交，**尚未推送**；按 S1 约定以 squash merge 合入 `main`）
 
 当前 Slice：S1「需求变成可招募项目」已完成本地实现、升级与空库重建验证；S2 未开始。
 
@@ -26,10 +26,10 @@ S1-01～S1-06 六个任务全部落地，链路为「草稿 → Mock 访谈 → 
 2026-09-24 在 Windows 本机（Node.js 24.13.1 / pnpm 11.19.0）执行：
 
 - `pnpm typecheck`：通过。`pnpm lint`：通过（无警告）。
-- `pnpm test`：5 个文件、60 个单元用例通过（`SpecDocument` 17、money 15、AIPM Contract 13、mock gateway 7、脱敏规则 8）。S0 时没有独立单元用例，S1 不再依赖 `--passWithNoTests`。
-- `pnpm test:integration`：8 个文件、98 个真实 PostgreSQL/Auth 用例通过（identity 5、projects 6、database-permissions 34、aipm-interview 12、spec-versions 12、spec-lock 8、enterprise-deposit 10、publish-recruitment 11）。
-- `pnpm build`：通过，11 条路由（新增 `/enterprise/projects/[projectId]/publish`、`/projects`、`/projects/[projectId]`）。
-- `pnpm test:e2e`：5 个真实浏览器用例通过（约 48s，对 `pnpm start` 的生产构建运行）。主链路用例覆盖：创建草稿 → 访谈两轮 → 生成候选 → 采用 → 手工另存 → 查看历史版本 → 补预算 → 锁定 → 锁定后旧入口被拒 → 创建模拟定金 → 模拟支付成功 → 替换敏感标记后确认发布 → Builder 在招募视图看到脱敏内容；并覆盖企业 B 的私有页 404、Builder 企业动作被拒、招募响应体不含原始需求/对话/邮箱/敏感标记。
+- `pnpm test`：8 个文件、82 个单元用例通过（`SpecDocument` 17、money 23、AIPM Contract 13、mock gateway 7、脱敏规则 10、`stableJson` 4、错误映射 5、字段级错误 3）。`test` 脚本已移除 `--passWithNoTests`，S1 不依赖空跑通过。
+- `pnpm test:integration`：9 个文件、112 个真实 PostgreSQL/Auth 用例通过（identity 5、projects 6、database-permissions 34、aipm-interview 14、spec-versions 12、spec-lock 10、enterprise-deposit 11、publish-recruitment 15、migration-rebuild 5）。
+- `pnpm build`：通过，11 条路由（`/`、`/_not-found`、`/enterprise/projects`、`/enterprise/projects/[projectId]`、`/enterprise/projects/[projectId]/publish`、`/enterprise/projects/[projectId]/spec`、`/enterprise/projects/new`、`/onboarding`、`/projects`、`/projects/[projectId]`、`/sign-in`）。
+- `pnpm test:e2e`：5 个真实浏览器用例通过（约 60s）。`playwright.config.ts` 的 `webServer` 自行执行 `corepack pnpm build && corepack pnpm start`，运行日志确认生产构建与生产服务启动均由用例运行过程完成，全新环境不必手动先 `build`、`start`。主链路用例覆盖：创建草稿 → 访谈两轮 → 生成候选 → 采用 → 手工另存 → 查看历史版本 → 补预算 → 锁定 → 锁定后旧入口被拒 → 创建模拟定金 → 模拟支付成功 → 替换敏感标记后确认发布 → Builder 在招募视图看到脱敏内容；并覆盖企业 B 的私有页 404、Builder 企业动作被拒、招募响应体不含原始需求/对话/邮箱/敏感标记。
 - `pnpm start`：生产构建启动成功；未登录请求受保护页返回 307 并指向 `/sign-in`。
 
 ### 升级与空库重建
@@ -38,6 +38,31 @@ S1-01～S1-06 六个任务全部落地，链路为「草稿 → Mock 访谈 → 
 - **重跑不删数据**：临时插入一张合成草稿（runtime 角色、显式列），连续执行 `pnpm db:prepare` 后该草稿的 `status`/`version`/时间戳不变；验证后已删除该临时行，本地库恢复为验证前状态（0 个项目）。
 - **空库顺序重建**：在本地实例另建合成数据库 `qianzo_migration_check`，仅补一个最小的 `auth.users` 桩件（真实环境由 Supabase 平台提供，是本 schema 唯一引用的平台对象），以 `supabase_admin` 连接按文件名顺序重放全部 9 条 migration，全部成功。重建后的关键不变量：`app` schema 7 张表、2 个守卫触发器（`projects_guard_locked_scope`、`payments_guard_success`）、2 个可延迟外键；`qianzo_runtime` 对 `spec_versions` 无 UPDATE/DELETE、对 `projects`/`payments` 无 DELETE、可写 `status`；`anon` 与 `authenticated` 对 `app.projects` 无 SELECT。验证后已删除该 scratch 数据库。
 - **未执行项**：没有运行 `supabase db reset --local`。该命令会清空本地实例，按 S1 规格「不擅自清空用户本地草稿」的要求未执行；本地实例保留现有合成数据。空库重建改用上述独立 scratch 数据库完成，平台 schema 用最小桩件替代，因此验证的是本仓库 SQL 链本身，不含 Supabase 平台对象的初始化。
+- **已固化为自动化用例**：上述「空库顺序重放」检查现由 `tests/integration/migration-rebuild.test.ts` 承担——自建独立 scratch 库 `qianzo_migration_rebuild`、按文件名顺序重放全部 migration、断言 7 张业务表 / 2 个守卫触发器 / 2 个可延迟外键 / `qianzo_runtime` 的列级授权，运行结束后删除该库。该用例以 `supabase_admin` 连接（迁移含 `alter role qianzo_runtime`，本机 `postgres` 不是超级用户）；若环境无法提供超级用户连接，套件**跳过并打印原因**，避免把缺少凭据误报成迁移链损坏。迁移中所有库级语句都作用于 `current_database()`，唯一硬编码的 `grant connect on database postgres` 因角色已持有该权限而为幂等空操作，因此重放不会改动本地现有库。
+
+## S1 代码质检修复（2026-09-24）
+
+S1 实现完成后做过一轮独立代码质检（功能正确性、异常处理、边界、规范与可读性、架构风险）。全部修复项已落地，验证结果见上节。
+
+**缺陷修复**
+
+- **消息上限 off-by-one**：`beginAipmInvocationWithDatabase` 原判据 `history.length + 1 > 上限`、`completeAipmInvocationWithDatabase` 原判据 `max(sequence) + 1 > 上限` 口径不一致；`maxSessionMessages` 又直接复用了「单次请求消息数」的常量。因 provider 失败时只落一条 USER 消息（`invokeAipmWithDatabase` 不调用 complete），会话消息数会出现奇数，累积到 39 条时 `begin` 放行并写入第 40 条 USER 消息、`complete` 随即抛错，造成「用户消息已落库但助手回复必然失败」的半程写入，且此后每轮都被拒。现在为会话总量单独定义 `aipmLimits.sessionMessages`，并让 `begin` 为一整轮（USER + ASSISTANT）预留空间；代价是一次 provider 失败会让会话提前一轮触顶，这是有意取舍，已在代码注释说明。
+- **E2E 运行方式未固化**：`playwright.config.ts` 的 `webServer.command` 原为 `pnpm dev`，与「E2E 对生产构建运行」的约定不符，全新环境无法复现，且 `next dev` 冷启动会现场编译 Server Action 造成首个用例假失败。现改为 `corepack pnpm build && corepack pnpm start`（`timeout` 300s、`reuseExistingServer: !CI` 保留），两份 README 同步。
+- **错误映射重复**：5 个 Server Action 各写一份「领域错误 → `*ActionState`」映射。抽出 `src/app/actions/error-mapping.ts` 统一处理跨域同构部分（认证、身份、输入校验）与 SQLSTATE 兜底（`23505`→`VERSION_CONFLICT`，`23514`/`23503`→`INVALID_INPUT`，仍不外泄 SQL 原文、供应商正文或堆栈），各 action 只保留领域特有映射与自身文案。归并后**未改变任何既有错误码或中文文案**（已逐行核对）。
+- **行锁与版本校验重复**：「`for update` 锁行 + `expectedVersion` 校验 + `version` 递增」在 5 处以上重复。抽出 `src/modules/projects/lock.ts` 的 `withProjectLock`，改造 9 处调用点并保持各自的判定顺序与错误码不变（如 `publish` 的「已 OPEN 重复意图」仍先于锁定指针校验），锁顺序仍为 Project → Payment。
+- **`ProjectError` 归属**：从 `projects/repository.ts` 迁到新建 `src/modules/projects/errors.ts`，与 `AipmError`/`SpecError`/`PaymentError` 对齐。
+- **`server-only` 边界缺失**：5 个 `repository.ts` 只以 `import type` 引用 `@/platform/db/client`（编译期擦除），因此运行时**并不存在**经其传递的 `server-only` 保护。现补显式 `import "server-only"`；`vitest.config.mts` 增加 alias 把 `server-only` 指向包自带 `empty.js`，仅为让集成测试能直接 import repository，不影响生产构建边界。
+- **Drizzle schema 与迁移分歧**：`schema.ts` 的 `projects_status_check` 由 `= 'DRAFT'` 同步为 `in ('DRAFT','OPEN')`，并注明迁移文件是约束的唯一权威来源（本仓库无 drizzle-kit，不生成迁移）。
+- **其余 P3**：删除 `parseAipmResponse` 中恒为假的 `contractVersion` 比较死分支；发布动作不再把所有 `ZodError` 都报成「未勾选确认」（改为区分字段级非法）；缺预算提示的 `data-error-code` 由 `PAYMENT_REQUIRED` 改为 `INVALID_PROPOSAL`；发布成功文案改走 `successMessage` 与 success 样式；`parseMinorUnits` 收紧千分位（`1,234.50` 可用，`1,2,3`/`12,34`/`1,,2` 拒绝）；`maskSpecIssues` 重构为统一两遍式比对（错误信息集合不变）；`test` 脚本移除 `--passWithNoTests`。
+
+**补齐的验收证据**（此前验收矩阵中无自动化对应用例）
+
+- 消息上限边界：奇数历史下整轮被拒且不产生半程写入；最后一轮要么完整成对落库要么整轮被拒。
+- 并发发布：两个相同意图都返回同一结果且 `version` 恰好 +1；两份不同预览只有一方成功、另一方 `PUBLISH_CONFLICT`，落库快照恰为胜者。
+- 已成功的定金在项目 `OPEN` 后重复请求返回同一结果且不改 `succeeded_at`/`version`/`published_at`。
+- 并发创建定金只产生一单。
+- `stableJson` 的键序无关性与数组序敏感性；`describeFieldIssues` 的路径拼接；`money` 的币种小数位、未知币种回退与超安全整数返回 `null`。
+- 对 `withProjectLock`、错误映射归并、`maskSpecIssues` 重构三处高风险改动的反向验证（判定顺序、错误码与文案、脱敏错误信息集合是否漂移）。
 
 ## S1 本地提交
 
@@ -48,14 +73,20 @@ S1-01～S1-06 六个任务全部落地，链路为「草稿 → Mock 访谈 → 
 - `c4e05f2 feat(payments): add enterprise mock deposit`
 - `24f0057 feat(projects): publish confirmed recruitment snapshots`
 
-S1-06 的验收与文档提交见本文件所在提交。
+S1-06 的验收与文档提交见 `eb38dc6`。
+
+本轮代码质检修复：
+
+- `cc67d08 fix(s1): resolve the review findings in the spec publish slice`（生产代码）
+- `8e96184 test(s1): cover the review boundaries and rebuild the migration chain`（测试）
+- 本文件所在提交 `docs(s1): record the review fixes and the verified results`
 
 ## 环境与远端
 
 - Node.js 24.13.1，pnpm 11.19.0；Docker Desktop 4.91.0 / Engine 29.8.0；Supabase CLI 2.117.0；Playwright 1.63.0 / Chromium 153（均安装在 D 盘）。
 - `origin` 为 `https://github.com/xuyuufan/QianZo.git`（私有）。
 - PR #1（S0）已由用户 merge，`origin/main` 现为 `08bf24b`，已包含完整 S0。
-- `feat/s1-spec-publish` 从 `origin/main` 建立，领先 6 个提交，**尚未推送**；S1 约定以 squash merge 合入 `main`。
+- `feat/s1-spec-publish` 从 `origin/main` 建立，本地领先 10 个提交（S1 规划与六个实施任务、S1-06 文档，以及本轮质检修复的生产代码、测试与本文档三条），**尚未推送**；S1 约定以 squash merge 合入 `main`。
 
 ## 已知限制与交接
 
