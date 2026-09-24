@@ -18,13 +18,16 @@ function SubmitButton() {
 export function OnboardingForm({
   defaultDisplayName = "",
   defaultRoles = [],
+  intent,
 }: {
   defaultDisplayName?: string;
   defaultRoles?: readonly ("ENTERPRISE" | "BUILDER")[];
+  intent?: "requester" | "builder";
 }) {
   const [state, action] = useActionState(completeOnboardingAction, emptyFormActionState);
   return (
     <form action={action} className="form-stack">
+      {intent ? <input type="hidden" name="intent" value={intent} /> : null}
       <label className="field">
         <span>显示名</span>
         <input
@@ -43,7 +46,7 @@ export function OnboardingForm({
             name="roles"
             type="checkbox"
             value="ENTERPRISE"
-            defaultChecked={defaultRoles.includes("ENTERPRISE")}
+            defaultChecked={defaultRoles.includes("ENTERPRISE") || intent === "requester"}
           />
           <span><strong>企业</strong><small>创建和管理项目草稿</small></span>
         </label>
@@ -52,7 +55,7 @@ export function OnboardingForm({
             name="roles"
             type="checkbox"
             value="BUILDER"
-            defaultChecked={defaultRoles.includes("BUILDER")}
+            defaultChecked={defaultRoles.includes("BUILDER") || intent === "builder"}
           />
           <span><strong>Builder</strong><small>后续切片开放接单</small></span>
         </label>

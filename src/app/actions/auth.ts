@@ -15,6 +15,7 @@ import type { FormActionState } from "./form-state";
 const signInSchema = z.object({
   email: z.email(),
   password: z.string().min(1),
+  intent: z.enum(["requester", "builder"]).optional(),
 });
 
 export async function signInAction(
@@ -24,6 +25,7 @@ export async function signInAction(
   const input = signInSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
+    intent: formData.get("intent") || undefined,
   });
   if (!input.success) {
     return { errorCode: "INVALID_CREDENTIALS", message: "邮箱或密码不正确。" };
@@ -35,7 +37,7 @@ export async function signInAction(
     return { errorCode: "INVALID_CREDENTIALS", message: "邮箱或密码不正确。" };
   }
 
-  redirect("/");
+  redirect(input.data.intent ? `/?intent=${input.data.intent}` : "/");
 }
 
 export async function signOutAction() {
@@ -64,5 +66,6 @@ export async function completeOnboardingAction(
     return { errorCode: "ONBOARDING_FAILED", message: "暂时无法保存，请稍后再试。" };
   }
 
-  redirect("/");
+  const intent = formData.get("intent");
+  redirect(intent === "requester" || intent === "builder" ? `/?intent=${intent}` : "/");
 }

@@ -27,8 +27,10 @@ const adminSql = postgres(requireLoopbackDatabaseUrl(tools.SUPABASE_DB_ADMIN_URL
 });
 const firstTimeEmail = `onboarding-${Date.now()}@qianzo.test`;
 const repeatEmail = `repeat-onboarding-${Date.now()}@qianzo.test`;
+const intentEmail = `requester-intent-${Date.now()}@qianzo.test`;
 let firstTimeUserId: string;
 let repeatUserId: string;
+let intentUserId: string;
 
 async function createAuthUser(email: string) {
   const { data, error } = await adminClient.auth.admin.createUser({
@@ -43,10 +45,13 @@ async function createAuthUser(email: string) {
 test.beforeAll(async () => {
   firstTimeUserId = await createAuthUser(firstTimeEmail);
   repeatUserId = await createAuthUser(repeatEmail);
+  intentUserId = await createAuthUser(intentEmail);
+  await adminSql`insert into app.users (id, display_name) values (${intentUserId}, '意图测试 Builder')`;
+  await adminSql`insert into app.user_roles (user_id, role) values (${intentUserId}, 'BUILDER')`;
 });
 
 test.afterAll(async () => {
-  for (const userId of [firstTimeUserId, repeatUserId]) {
+  for (const userId of [firstTimeUserId, repeatUserId, intentUserId]) {
     if (!userId) continue;
     await adminSql`delete from app.user_roles where user_id = ${userId}`;
     await adminSql`delete from app.users where id = ${userId}`;
@@ -57,17 +62,16 @@ test.afterAll(async () => {
 });
 
 test("a seeded Builder keeps a real session across refresh and can sign out", async ({ page }) => {
-  await page.goto("/enterprise/projects");
-  await expect(page).toHaveURL(/\/sign-in$/);
+  await page.goto("/sign-in?intent=builder");
 
   await page.getByLabel("邮箱").fill("builder@qianzo.local");
   await page.getByLabel("密码").fill(tools.DEMO_USER_PASSWORD);
   await page.getByRole("button", { name: "登录" }).click();
 
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: "已登录" })).toBeVisible();
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/projects$/);
+  await expect(page.getByRole("heading", { name: "招募中的项目" })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("heading", { name: "已登录" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "招募中的项目" })).toBeVisible();
 
   await page.getByRole("button", { name: "退出登录" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
@@ -87,7 +91,7 @@ test("a first-time Auth user completes onboarding through the real UI", async ({
   await page.getByRole("button", { name: "完成设置" }).click();
 
   await expect(page).toHaveURL(/\/enterprise\/projects$/);
-  await expect(page.getByText("你好，首次接入企业")).toBeVisible();
+  await expect(page.getByText("ENTERPRISE WORKSPACE · 首次接入企业")).toBeVisible();
 });
 
 test("an onboarded user returns to onboarding to add the ENTERPRISE role", async ({ page }) => {
@@ -101,8 +105,8 @@ test("an onboarded user returns to onboarding to add the ENTERPRISE role", async
   await page.getByRole("checkbox", { name: /Builder/ }).check();
   await page.getByRole("button", { name: "完成设置" }).click();
 
-  await expect(page).toHaveURL(/\/$/);
-  await page.getByRole("link", { name: "增加企业身份" }).click();
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/projects$/);
+  await page.goto("/onboarding");
 
   await expect(page).toHaveURL(/\/onboarding$/);
   await expect(page.getByLabel("显示名")).toHaveValue("再次设置用户");
@@ -112,5 +116,16 @@ test("an onboarded user returns to onboarding to add the ENTERPRISE role", async
   await page.getByRole("button", { name: "完成设置" }).click();
 
   await expect(page).toHaveURL(/\/enterprise\/projects$/);
-  await expect(page.getByText("你好，再次设置用户")).toBeVisible();
+  await expect(page.getByText("ENTERPRISE WORKSPACE · 再次设置用户")).toBeVisible();
+});
+
+test("requester intent survives login and directs a Builder to role onboarding", async ({ page }) => {
+  await page.goto("/sign-in?intent=requester");
+  await page.getByLabel("邮箱").fill(intentEmail);
+  await page.getByLabel("密码").fill(tools.DEMO_USER_PASSWORD);
+  await page.getByRole("button", { name: "登录" }).click();
+
+  await expect(page).toHaveURL(/\/onboarding\?intent=requester$/);
+  await expect(page.getByRole("checkbox", { name: /企业/ })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: /Builder/ })).toBeChecked();
 });

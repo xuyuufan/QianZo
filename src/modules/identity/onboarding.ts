@@ -7,6 +7,7 @@ import { userRoles, users, type UserRole, type UserStatus } from "@/platform/db/
 export const onboardingInputSchema = z
   .object({
     displayName: z.string().trim().min(1).max(80),
+    intent: z.enum(["requester", "builder"]).nullable().optional(),
     roles: z
       .array(z.enum(["ENTERPRISE", "BUILDER"]))
       .min(1)

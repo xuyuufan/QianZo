@@ -15,10 +15,11 @@ function SubmitButton() {
   );
 }
 
-export function SignInForm() {
+export function SignInForm({ intent }: { intent?: "requester" | "builder" }) {
   const [state, action] = useActionState(signInAction, emptyFormActionState);
   return (
     <form action={action} className="form-stack">
+      {intent ? <input type="hidden" name="intent" value={intent} /> : null}
       <label className="field">
         <span>邮箱</span>
         <input name="email" type="email" autoComplete="email" required />

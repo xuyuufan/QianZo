@@ -23,26 +23,31 @@ export default async function EnterpriseProjectsPage() {
       <section className="workspace-content">
         <div className="project-list-heading">
           <div>
-            <p className="eyebrow">你好，{actor.displayName}</p>
-            <h1 className="section-title">项目草稿</h1>
+            <p className="eyebrow">ENTERPRISE WORKSPACE · {actor.displayName}</p>
+            <h1 className="section-title">我的项目</h1>
+            <p className="lede">在这里管理需求草稿、评审范围与已发布招募。</p>
           </div>
-          <Link className="button button-link" href="/enterprise/projects/new">创建项目</Link>
+          <Link className="button button-link create-project-cta" href="/enterprise/projects/new">＋ <span>创建项目</span></Link>
         </div>
         {projectList.length === 0 ? (
-          <div className="empty-state">
-            <h2>还没有项目</h2>
-            <p className="lede">创建第一份草稿，内容会保存到本地真实数据库。</p>
+          <div className="empty-state workspace-empty">
+            <span className="empty-symbol" aria-hidden="true">＋</span>
+            <p className="eyebrow">YOUR NEXT IDEA STARTS HERE</p>
+            <h2>从一个想法开始</h2>
+            <p className="lede">先保存标题和原始需求，再逐步整理为清晰可评审的 Spec。</p>
+            <Link className="button button-link" href="/enterprise/projects/new">创建第一份草稿</Link>
           </div>
         ) : (
-          <ul className="project-list">
+          <ul className="project-list project-card-list">
             {projectList.map((project) => (
               <li key={project.id}>
                 <Link href={`/enterprise/projects/${project.id}`}>
                   <span>
-                    <strong>{project.title}</strong>
-                    <small>版本 {project.version} · {project.status}</small>
+                    <small className="project-card-kicker">PROJECT · {String(project.version).padStart(2, "0")}</small>
+                    <strong>{project.title || "未命名项目"}</strong>
+                    <small>项目版本 {project.version}</small>
                   </span>
-                  <span aria-hidden="true">→</span>
+                  <span className={`status-pill status-${project.status.toLowerCase()}`}>{project.status === "OPEN" ? "招募中" : "草稿"}</span>
                 </Link>
               </li>
             ))}

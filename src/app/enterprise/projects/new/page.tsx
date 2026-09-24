@@ -25,9 +25,9 @@ export default async function NewProjectPage() {
       <section className="workspace-content">
         <Link className="back-link" href="/enterprise/projects">← 返回项目列表</Link>
         <div>
-          <p className="eyebrow">新项目</p>
-          <h1 className="section-title">创建项目草稿</h1>
-          <p className="lede">先保存原始需求，后续切片再进入 AIPM 访谈。</p>
+          <p className="eyebrow">NEW PROJECT · 01</p>
+          <h1 className="section-title">让想法有一个起点</h1>
+          <p className="lede">先记录标题和原始需求。创建后可以随时回来继续完善。</p>
         </div>
         <CreateProjectForm projectId={randomUUID()} />
       </section>
