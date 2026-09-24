@@ -16,9 +16,14 @@ export const aipmLimits = {
   /** Caps the messages in a single request transcript. */
   messagesPerRequest: 40,
   /**
-   * Caps the total rows stored for one interview session (USER + ASSISTANT).
-   * Separate from `messagesPerRequest` on purpose: a request transcript and the
-   * persisted session are different things, so the two limits must not drift.
+   * Caps the rows one interview session may hold (USER + ASSISTANT). Separate
+   * from `messagesPerRequest` on purpose: a request transcript and the persisted
+   * session are different things, so the two limits must not drift.
+   *
+   * It is an admission cap: a round is refused when the session has no room for
+   * its two rows, and an admitted round always gets to store its answer. Two
+   * overlapping turns can therefore push a session slightly past the cap rather
+   * than strand a user message that can never be answered.
    */
   sessionMessages: 40,
   userMessageLength: 4_000,

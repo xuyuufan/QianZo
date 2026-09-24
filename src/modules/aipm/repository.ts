@@ -224,15 +224,13 @@ export async function completeAipmInvocationWithDatabase(
           from app.aipm_messages
           where session_id = ${session.id}
         `);
-        // `begin` reserved this assistant slot, so a well-formed round always
-        // passes here. The check still uses the same `maxSessionMessages` as
-        // `begin`, which keeps the session total from ever exceeding the limit.
-        if (next.sequence > maxSessionMessages) {
-          throw new AipmError(
-            "MESSAGE_LIMIT_REACHED",
-            "The interview reached the message limit for this session.",
-          );
-        }
+        // No cap check here, deliberately. `begin` admits a round only when the
+        // session has room for both rows, and once a USER message is admitted its
+        // answer must be storable — refusing it here would strand that message
+        // for good. Overlapping turns can therefore push a session a little past
+        // the cap; that is the cheaper failure, because the next `begin` refuses
+        // while every admitted message still gets its reply. The cap bounds what
+        // can be admitted, not what can be answered.
 
         // A late or concurrent answer keeps its history but is never rebased onto
         // a newer baseline.
