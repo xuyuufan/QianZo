@@ -82,6 +82,7 @@ export async function simulatePaymentSuccessAction(
   try {
     const userId = await requireAuth();
     const payment = await simulatePaymentSuccess(userId, {
+      projectId,
       paymentId: formData.get("paymentId"),
     });
     revalidatePaymentPages(projectId);

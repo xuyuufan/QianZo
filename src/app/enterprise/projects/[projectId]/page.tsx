@@ -42,10 +42,16 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         <Link className="back-link" href="/enterprise/projects">← 返回项目列表</Link>
         <div className="project-heading">
           <div>
-            <p className="eyebrow">草稿 · 版本 {project.version}</p>
+            <p className="eyebrow">
+              {project.status === "OPEN" ? "已发布" : "草稿"} · 版本 {project.version}
+            </p>
             <h1 className="section-title">{project.title}</h1>
           </div>
-          <span className="status-pill">{locked ? "DRAFT · 已锁定范围" : project.status}</span>
+          {/* Publishing locks the scope, so a published project stays locked:
+              keep the annotation but never replace the real status with DRAFT. */}
+          <span className="status-pill">
+            {locked ? `${project.status} · 已锁定范围` : project.status}
+          </span>
         </div>
         {saved ? <p className="form-message success" role="status">草稿已保存。</p> : null}
         {locked ? (

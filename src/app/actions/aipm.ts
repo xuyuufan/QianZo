@@ -74,6 +74,13 @@ export async function invokeAipmAction(
       instruction: formData.get("instruction") || undefined,
     });
   } catch (error) {
+    // A provider or validation failure still committed the USER message and
+    // moved the project version inside `begin`. Refresh the pages as well, so
+    // the form picks up the new expectedVersion and the retained message can
+    // actually be resent; otherwise every retry is rejected with
+    // VERSION_CONFLICT until the user refreshes by hand.
+    revalidatePath(`/enterprise/projects/${projectId}`);
+    revalidatePath(`/enterprise/projects/${projectId}/spec`);
     return actionFailure(error);
   }
 

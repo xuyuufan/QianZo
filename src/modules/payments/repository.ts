@@ -152,7 +152,7 @@ export async function simulatePaymentSuccessWithDatabase(
     const [found] = await transaction
       .select()
       .from(payments)
-      .where(eq(payments.id, input.paymentId))
+      .where(and(eq(payments.id, input.paymentId), eq(payments.projectId, input.projectId)))
       .limit(1);
     if (!found) {
       throw new PaymentError("NOT_FOUND", "Payment not found.");

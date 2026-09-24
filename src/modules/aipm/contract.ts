@@ -33,12 +33,27 @@ export const aipmLimits = {
 
 const aipmOperationSchema = z.enum(["INTERVIEW", "GENERATE_SPEC"]);
 
-const transcriptMessageSchema = z
-  .object({
-    role: z.enum(["user", "assistant"]),
-    content: z.string().min(1).max(aipmLimits.userMessageLength),
-  })
-  .strict();
+/**
+ * A transcript entry is capped by the limit of the role that produced it. The
+ * platform echoes its own assistant replies back in the next request, and those
+ * may legitimately run to `assistantMessageLength`, so applying the user limit
+ * to every entry would make the platform build a request that its own
+ * `aipmRequestSchema` rejects.
+ */
+const transcriptMessageSchema = z.discriminatedUnion("role", [
+  z
+    .object({
+      role: z.literal("user"),
+      content: z.string().min(1).max(aipmLimits.userMessageLength),
+    })
+    .strict(),
+  z
+    .object({
+      role: z.literal("assistant"),
+      content: z.string().min(1).max(aipmLimits.assistantMessageLength),
+    })
+    .strict(),
+]);
 
 const completenessSchema = z
   .object({

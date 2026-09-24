@@ -277,7 +277,10 @@ export async function lockSpecWithDatabase(
         }
 
         // Replaying the same confirmation returns the already locked version.
-        if (project.lockedSpecVersionId === current.id) {
+        // The submitted id must match too: a stale or tampered form naming a
+        // different version is not the same lock intent, so it is refused below
+        // instead of being reported as a successful replay.
+        if (project.lockedSpecVersionId === current.id && input.specVersionId === current.id) {
           return toStoredSpecVersion(current);
         }
         if (project.lockedSpecVersionId) {
