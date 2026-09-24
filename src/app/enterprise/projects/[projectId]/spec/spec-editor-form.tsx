@@ -7,6 +7,8 @@ import { saveSpecVersionAction } from "@/app/actions/specs";
 import { specDocumentSchema } from "@/modules/specs/document";
 import { describeFieldIssues } from "@/platform/validation";
 
+import { syncEditorWithServer } from "./editor-sync";
+
 type SpecEditorFormProps = {
   projectId: string;
   version: number;
@@ -26,11 +28,14 @@ export function SpecEditorForm({ projectId, version, initialContent }: SpecEdito
 
   // A new current version arrives from the server: follow it instead of keeping
   // the stale value, without remounting the form (which would drop the action
-  // result). Adjusting state during render is the documented derived-state
-  // pattern, and the two values match again on the next render.
-  if (initialContent !== syncedContent) {
-    setSyncedContent(initialContent);
-    setContent(initialContent);
+  // result). Unsaved edits win over the server value, so generating a candidate
+  // from the interview form on this page cannot wipe what the user just typed.
+  // Adjusting state during render is the documented derived-state pattern, and
+  // the two values match again on the next render.
+  const synced = syncEditorWithServer({ initialContent, content, syncedContent });
+  if (synced) {
+    setSyncedContent(synced.syncedContent);
+    setContent(synced.content);
   }
 
   const validation = useMemo(() => {
