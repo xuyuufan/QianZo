@@ -776,6 +776,14 @@ type SpecDocumentV1 = {
 - 逐条审核结果必须完整对应当前 Milestone 的验收标准。PASS 要求全部通过；FAIL 至少一条不通过并提供原因。
 - V0 不提供已锁 Spec 解锁；相关异常处理不通过绕过锁定规则实现。
 
-S1 的本地施工约定与验收细节见 [S1 README](slices/S1-spec-publish/README.md)：锁定时同时冻结项目标题、原始需求和参考预算；申请前招募视图暂面向已登录的有效平台用户，由锁定 Spec 派生、企业预览确认后持久化，发布后不覆盖。企业 Mock 定金使用独立固定演示金额。这些约定用于本地合成演示，不改变第 4 节的 Pending Product Decisions。
+S1 的本地施工约定与验收细节见 [S1 README](slices/S1-spec-publish/README.md)，已于 2026-09-24 实施完成（实现、验证与提交记录见 [PROJECT_STATUS](PROJECT_STATUS.md)）：锁定时同时冻结项目标题、原始需求和参考预算；申请前招募视图暂面向已登录的有效平台用户，由锁定 Spec 派生、企业预览确认后持久化，发布后不覆盖。企业 Mock 定金使用独立固定演示金额。这些约定用于本地合成演示，不改变第 4 节的 Pending Product Decisions。
+
+实施中固定下来的契约（后续 Slice 应沿用，不应另行发明）：
+
+- AIPM 响应的权威校验在平台侧：契约版本、invocationId 关联、生成操作必须携带合法 Spec、响应体积上限都不过关即不落库；Mock 只返回候选，不能写库、不能锁定或推进状态。
+- `PaymentProvider` 首轮只有 `createPayment`；金额、币种、付款人与用途由服务端决定，`simulatePaymentSuccess` 不属于 Provider 契约。付款成功只是发布的前置条件，不自动推进状态。
+- 发布采用白名单快照：只保存 schemaVersion、来源锁定版本、脱敏标题、参考预算与脱敏后的 `SpecDocumentV1`；招募读取只 SELECT OPEN 行的快照列并返回独立 DTO，原始需求、访谈对话、消息 payload、账号与付款明细从不进入快照。
+- 脱敏只允许替换文字：结构 ID、引用、条目数量、里程碑顺序与 `dueAfterDays` 及每条验收标准必须与锁定版本一致，否则拒绝发布。
+- `projects` 指向 `spec_versions` 的两个复合外键使用 `NO ACTION + DEFERRABLE INITIALLY DEFERRED`（`RESTRICT` 无法延迟检查），其余外键保持 `RESTRICT`。
 
 预算、报价、真实定金和成交条款不在本 Spec 结构中暗含确定，仍遵循第 4 节的产品决策边界。

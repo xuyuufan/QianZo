@@ -1,6 +1,6 @@
 # S1：需求变成可招募项目
 
-**状态：规划完成，尚未实施（2026-09-23）。等级：V0 REQUIRED。对应 IBQ-04～06。** 实际进度与历史验证见 [PROJECT_STATUS](../../PROJECT_STATUS.md)。本文件是下一阶段施工说明，不代表 S1 已获业务开发授权或已经通过验收。
+**状态：已实施并通过验收（2026-09-24）。等级：V0 REQUIRED。对应 IBQ-04～06。** 实际进度、验证结果与提交记录见 [PROJECT_STATUS](../../PROJECT_STATUS.md)；权威快照仍以本文件的契约、表设计与验收矩阵为准。
 
 目标：企业从 S0 草稿出发，通过 Mock AIPM 访谈生成候选 Spec，审阅、保存版本并锁定，完成企业 Mock 定金后，预览确认脱敏内容并发布。Builder 登录后能评估已发布项目；申请和开工留在 S2。
 
@@ -210,7 +210,7 @@ PaymentProvider 只承担创建模拟付款的小接口，Mock 专用 `simulateP
 
 ## 9. Definition of Done 与验收矩阵
 
-以下为未来实施的必需验收，当前均未执行。
+以下为 S1 实施的必需验收。逐项的实际执行结果（命令、用例数与未执行项）记录在 [PROJECT_STATUS](../../PROJECT_STATUS.md)。
 
 | 范围 | 必需用例 |
 |---|---|
@@ -258,4 +258,8 @@ build 与 E2E 顺序执行，避免争用 .next；遵循 README 的 pnpm PATH �
 剩余：已知限制；S2 申请、选择、Builder Mock 押金与开工尚未开始
 ```
 
-本次仅编写施工规划，不运行 migration、不改业务代码、不启动 S1。下一次获得实施授权后从 S1-01 开始，先核验包含完整 S0 的基线，再按上述任务推进。
+S1 已于 2026-09-24 按上述六个任务实施完成，实施顺序、每个任务的 commit 与验收结果见 [PROJECT_STATUS](../../PROJECT_STATUS.md)。实施中形成并在实现里固定的补充契约：
+
+- `ON DELETE RESTRICT` 无法被 `DEFERRABLE` 延迟检查，因此 `projects` 指向 `spec_versions` 的两个复合外键改为 `NO ACTION + DEFERRABLE INITIALLY DEFERRED`，使带历史的项目能在同一事务内删除；其余外键保持 `RESTRICT`。
+- 空库重建的验证在独立 scratch 数据库上完成，仅用最小 `auth.users` 桩件替代 Supabase 平台对象；`supabase db reset --local` 未执行，以遵守「不擅自清空用户本地草稿」。
+- E2E 对 `pnpm start` 的生产构建运行：`next dev` 冷启动会现场编译 Server Action 并造成首个用例假失败，生产服务无此抖动。
