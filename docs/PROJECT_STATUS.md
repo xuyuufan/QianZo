@@ -26,8 +26,8 @@ S1-01～S1-06 六个任务全部落地，链路为「草稿 → Mock 访谈 → 
 2026-09-24 在 Windows 本机（Node.js 24.13.1 / pnpm 11.19.0）执行：
 
 - `pnpm typecheck`：通过。`pnpm lint`：通过（无警告）。
-- `pnpm test`：8 个文件、82 个单元用例通过（`SpecDocument` 17、money 23、AIPM Contract 13、mock gateway 7、脱敏规则 10、`stableJson` 4、错误映射 5、字段级错误 3）。`test` 脚本已移除 `--passWithNoTests`，S1 不依赖空跑通过。
-- `pnpm test:integration`：9 个文件、112 个真实 PostgreSQL/Auth 用例通过（identity 5、projects 6、database-permissions 34、aipm-interview 14、spec-versions 12、spec-lock 10、enterprise-deposit 11、publish-recruitment 15、migration-rebuild 5）。
+- `pnpm test`：9 个文件、87 个单元用例通过（`SpecDocument` 17、money 23、AIPM Contract 14、mock gateway 7、脱敏规则 10、`stableJson` 4、错误映射 5、字段级错误 3、编辑器同步 4）。`test` 脚本已移除 `--passWithNoTests`，S1 不依赖空跑通过。
+- `pnpm test:integration`：9 个文件、115 个真实 PostgreSQL/Auth 用例通过（identity 5、projects 6、database-permissions 34、aipm-interview 15、spec-versions 12、spec-lock 11、enterprise-deposit 12、publish-recruitment 15、migration-rebuild 5）。
 - `pnpm build`：通过，11 条路由（`/`、`/_not-found`、`/enterprise/projects`、`/enterprise/projects/[projectId]`、`/enterprise/projects/[projectId]/publish`、`/enterprise/projects/[projectId]/spec`、`/enterprise/projects/new`、`/onboarding`、`/projects`、`/projects/[projectId]`、`/sign-in`）。
 - `pnpm test:e2e`：5 个真实浏览器用例通过（约 60s）。`playwright.config.ts` 的 `webServer` 自行执行 `corepack pnpm build && corepack pnpm start`，运行日志确认生产构建与生产服务启动均由用例运行过程完成，全新环境不必手动先 `build`、`start`。主链路用例覆盖：创建草稿 → 访谈两轮 → 生成候选 → 采用 → 手工另存 → 查看历史版本 → 补预算 → 锁定 → 锁定后旧入口被拒 → 创建模拟定金 → 模拟支付成功 → 替换敏感标记后确认发布 → Builder 在招募视图看到脱敏内容；并覆盖企业 B 的私有页 404、Builder 企业动作被拒、招募响应体不含原始需求/对话/邮箱/敏感标记。
 - `pnpm start`：生产构建启动成功；未登录请求受保护页返回 307 并指向 `/sign-in`。
