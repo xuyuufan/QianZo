@@ -68,6 +68,8 @@ export const projects = appSchema.table(
     currency: text("currency"),
     lockedSpecVersionId: uuid("locked_spec_version_id"),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
+    publishedSpecSnapshot: jsonb("published_spec_snapshot"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

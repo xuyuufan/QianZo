@@ -15,9 +15,19 @@ import {
 
 export type Project = typeof projects.$inferSelect;
 
+export type ProjectErrorCode =
+  | "NOT_FOUND"
+  | "CREATE_CONFLICT"
+  | "VERSION_CONFLICT"
+  | "SPEC_LOCKED"
+  | "INVALID_SOURCE"
+  | "INVALID_PREVIEW"
+  | "PUBLISH_CONFLICT"
+  | "INVALID_STAGE";
+
 export class ProjectError extends Error {
   constructor(
-    public readonly code: "NOT_FOUND" | "CREATE_CONFLICT" | "VERSION_CONFLICT" | "SPEC_LOCKED",
+    public readonly code: ProjectErrorCode,
     message: string,
   ) {
     super(message);
@@ -66,6 +76,8 @@ type ProjectRow = {
   currency: string | null;
   locked_spec_version_id: string | null;
   locked_at: Date | null;
+  published_spec_snapshot: unknown;
+  published_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -84,6 +96,8 @@ function toProject(row: ProjectRow): Project {
     currency: row.currency,
     lockedSpecVersionId: row.locked_spec_version_id,
     lockedAt: row.locked_at,
+    publishedSpecSnapshot: row.published_spec_snapshot,
+    publishedAt: row.published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -106,7 +120,8 @@ export async function createProjectWithDatabase(
       on conflict do nothing
       returning id, owner_id, title, original_requirement, status, version,
         current_spec_version_id, budget_min_minor, budget_max_minor, currency,
-        locked_spec_version_id, locked_at, created_at, updated_at
+        locked_spec_version_id, locked_at, published_spec_snapshot, published_at,
+        created_at, updated_at
     `);
     const created = inserted[0];
     if (created) {

@@ -129,7 +129,6 @@ describe("application database boundary", () => {
     ["delete rows", "delete from app.projects"],
     ["truncate rows", "truncate app.projects"],
     ["change an owner", "update app.projects set owner_id = gen_random_uuid()"],
-    ["change project status", "update app.projects set status = 'OPEN'"],
     ["change user status", "update app.users set status = 'DISABLED'"],
     ["elevate roles", "alter role qianzo_runtime superuser"],
     ["rewrite interview messages", "update app.aipm_messages set content = '改写历史'"],
@@ -217,8 +216,8 @@ describe("application database boundary", () => {
       can_update_budget: true,
       can_update_locked_pointer: true,
       can_update_owner: false,
-      // Status only becomes writable when the publish action lands (S1-05).
-      can_update_status: false,
+      // The publish action owns the transition; the constraint still guards it.
+      can_update_status: true,
       can_insert_budget: false,
       can_update_payment_status: true,
       can_update_payment_amount: false,

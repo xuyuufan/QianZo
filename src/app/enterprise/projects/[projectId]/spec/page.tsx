@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { SpecPreview } from "@/components/spec-preview";
 import { getProjectInterview } from "@/modules/aipm/service";
 import { getActorById } from "@/modules/identity/service";
 import { describeBudget } from "@/modules/projects/money";
@@ -15,7 +16,6 @@ import { AdoptCandidateForm } from "./adopt-candidate-form";
 import { InterviewForm } from "./interview-form";
 import { LockSpecForm } from "./lock-spec-form";
 import { SpecEditorForm } from "./spec-editor-form";
-import { SpecPreview } from "./spec-preview";
 
 export const dynamic = "force-dynamic";
 

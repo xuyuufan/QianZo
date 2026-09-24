@@ -47,6 +47,16 @@ export function assertActiveRole(actor: Actor, role: UserRole) {
   }
 }
 
+/**
+ * For shared views that any active platform user may read, regardless of role.
+ * An actor row only exists after onboarding.
+ */
+export function assertActiveActor(actor: Actor) {
+  if (actor.status !== "ACTIVE") {
+    throw new IdentityError("ACTOR_DISABLED", "This account is disabled.");
+  }
+}
+
 export async function getActorByIdWithDatabase(
   database: Database,
   userId: string,

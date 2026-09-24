@@ -3,6 +3,7 @@ import "server-only";
 import { requireRole } from "@/modules/identity/service";
 import { getDatabase } from "@/platform/db/client";
 
+import { publishProjectWithDatabase } from "./publish";
 import {
   createProjectWithDatabase,
   getOwnProjectWithDatabase,
@@ -34,4 +35,9 @@ export async function updateProjectDraft(userId: string, input: unknown) {
 export async function saveReferenceBudget(userId: string, input: unknown) {
   const actor = await requireRole(userId, "ENTERPRISE");
   return saveReferenceBudgetWithDatabase(getDatabase(), actor, input);
+}
+
+export async function publishProject(userId: string, input: unknown) {
+  const actor = await requireRole(userId, "ENTERPRISE");
+  return publishProjectWithDatabase(getDatabase(), actor, input);
 }

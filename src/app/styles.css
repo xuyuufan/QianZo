@@ -239,6 +239,12 @@ select {
   font-size: 0.875rem;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
 .empty-state {
   max-width: 48rem;
   margin: clamp(4rem, 12vh, 8rem) auto 0;

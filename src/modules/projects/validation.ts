@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { specDocumentSchema } from "@/modules/specs/document";
+
 import { DEMO_CURRENCY, parseMinorUnits } from "./money";
 
 export const projectIdSchema = z.uuid();
@@ -71,3 +73,20 @@ export const saveReferenceBudgetInputSchema = z
   }));
 
 export type SaveReferenceBudgetInput = z.infer<typeof saveReferenceBudgetInputSchema>;
+
+/**
+ * Publish intent. The masked preview is validated as a full SpecDocumentV1 and
+ * the confirmation must be present: it applies to the exact preview submitted.
+ */
+export const publishProjectInputSchema = z
+  .object({
+    projectId: projectIdSchema,
+    expectedVersion: z.coerce.number().int().positive(),
+    lockedSpecVersionId: z.uuid(),
+    maskedTitle: z.string().trim().min(1).max(120),
+    maskedDocument: specDocumentSchema,
+    confirmed: z.literal("on"),
+  })
+  .strict();
+
+export type PublishProjectInput = z.infer<typeof publishProjectInputSchema>;

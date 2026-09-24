@@ -48,7 +48,7 @@ test.afterAll(async () => {
   await adminSql.end();
 });
 
-test("a draft becomes a locked scope with a simulated enterprise deposit", async ({
+test("a draft becomes a published recruitment project end to end", async ({
   browser,
   page,
 }) => {
@@ -58,7 +58,7 @@ test("a draft becomes a locked scope with a simulated enterprise deposit", async
   await loginDemoUser(page, "enterprise-a@qianzo.local", password);
   await page.getByRole("link", { name: "创建项目" }).click();
   await page.getByLabel("项目标题").fill("E2E 访谈项目");
-  await page.getByLabel("原始需求").fill("需要把访谈整理成可招募的确认范围。");
+  await page.getByLabel("原始需求").fill("ZZSECRET-原始需求：需要把访谈整理成可招募的确认范围。");
   await page.getByRole("button", { name: "创建草稿" }).click();
   await expect(page).toHaveURL(/\/enterprise\/projects\/[0-9a-f-]{36}$/, { timeout: 15_000 });
   const projectPath = new URL(page.url()).pathname;
@@ -68,7 +68,7 @@ test("a draft becomes a locked scope with a simulated enterprise deposit", async
 
   await page
     .getByLabel("访谈回复")
-    .fill("我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。");
+    .fill("ZZSECRET-访谈：我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。");
   await page.getByRole("button", { name: "发送访谈回复" }).click();
   await expect(page.getByText("已收到访谈回复。")).toBeVisible();
   await expect(page.locator('li[data-role="ASSISTANT"]')).toHaveCount(1);
@@ -155,7 +155,24 @@ test("a draft becomes a locked scope with a simulated enterprise deposit", async
   await expect(page.getByRole("button", { name: "模拟支付成功" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "创建企业模拟定金" })).toHaveCount(0);
 
-  const privateMessage = "我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。";
+  // Masked preview: only text may change, then the final preview is confirmed.
+  const previewEditor = page.getByLabel("脱敏预览（JSON）");
+  await expect(previewEditor).toBeVisible();
+  await expect(page.getByText("结构与锁定版本一致，可以确认发布。")).toBeVisible();
+  const maskedContent = (await previewEditor.inputValue()).replaceAll("ZZSECRET-访谈：", "");
+  await previewEditor.fill(maskedContent);
+  await page.getByLabel("招募标题（脱敏后）").fill("E2E 招募项目（脱敏）");
+  await expect(page.getByRole("button", { name: "确认并发布招募" })).toBeDisabled();
+  await page.getByRole("checkbox", { name: /我已确认这是最终预览/ }).check();
+  await page.getByRole("button", { name: "确认并发布招募" }).click();
+  // The publish form is replaced by the published state once the intent succeeded.
+  await expect(page.getByRole("heading", { name: "已发布" })).toBeVisible();
+  await expect(page.getByText(/项目状态为 OPEN，发布于/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "确认并发布招募" })).toHaveCount(0);
+  await expect(page.getByText("已锁定的范围")).toHaveCount(1);
+
+  const privateMessage = "ZZSECRET-访谈：我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。";
+  const privateRequirement = "ZZSECRET-原始需求：需要把访谈整理成可招募的确认范围。";
   const specPath = `${projectPath}/spec`;
 
   const enterpriseBContext = await browser.newContext({ baseURL: "http://127.0.0.1:3000" });
@@ -172,5 +189,25 @@ test("a draft becomes a locked scope with a simulated enterprise deposit", async
   await loginDemoUser(builderPage, "builder@qianzo.local", password);
   await builderPage.goto(specPath);
   await expect(builderPage).toHaveURL(/\/$/);
+
+  // The published project shows up in the recruitment view, masked.
+  const projectId = projectPath.split("/").pop() ?? "";
+  await builderPage.goto("/projects");
+  await expect(builderPage.getByRole("link", { name: /E2E 招募项目（脱敏）/ })).toBeVisible();
+  const recruitmentResponse = await builderPage.goto(`/projects/${projectId}`);
+  const recruitmentBody = (await recruitmentResponse?.text()) ?? "";
+  expect(recruitmentBody).not.toContain("ZZSECRET");
+  expect(recruitmentBody).not.toContain(privateRequirement);
+  expect(recruitmentBody).not.toContain(privateMessage);
+  expect(recruitmentBody).not.toContain("qianzo.local");
+  await expect(builderPage.getByRole("heading", { name: "E2E 招募项目（脱敏）" })).toBeVisible();
+  const publishedBudget = builderPage.locator("p").filter({ hasText: "参考预算" });
+  await expect(publishedBudget).toContainText("¥1000.00 – ¥2500.50");
+  // The cycle comes from the last milestone of the locked document (30 days).
+  await expect(publishedBudget).toContainText("30 个自然日");
+  await expect(builderPage.getByText(/不是成交价或报价/)).toBeVisible();
+  await expect(builderPage.getByText("里程碑与验收")).toBeVisible();
+  // A draft of the same enterprise stays invisible to the builder.
+  expect(recruitmentBody).not.toContain("未发布");
   await builderContext.close();
 });

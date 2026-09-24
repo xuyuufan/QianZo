@@ -6,10 +6,12 @@ import { enterpriseDeposit } from "@/modules/payments/mock-provider";
 import { getProjectPayment } from "@/modules/payments/service";
 import { describeAmount, describeBudget } from "@/modules/projects/money";
 import { projectIdSchema } from "@/modules/projects/validation";
+import { getProjectSpecs } from "@/modules/specs/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
 import { ProjectHeader } from "../../project-header";
 import { DepositForm } from "./deposit-form";
+import { PublishForm } from "./publish-form";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +35,21 @@ export default async function ProjectPublishPage({ params }: PublishPageProps) {
 
   const parsedId = projectIdSchema.safeParse((await params).projectId);
   if (!parsedId.success) notFound();
-  const state = await getProjectPayment(userId, parsedId.data);
-  if (!state) notFound();
+  const projectId = parsedId.data;
 
+  const state = await getProjectPayment(userId, projectId);
+  if (!state) notFound();
   const { project, payment } = state;
+
+  const specs = await getProjectSpecs(userId, projectId);
+  if (!specs) notFound();
+  const lockedVersion =
+    specs.versions.find((version) => version.id === project.lockedSpecVersionId) ?? null;
+
   const locked = project.lockedSpecVersionId !== null;
+  const published = project.status === "OPEN";
   const budget = describeBudget(project.budgetMinMinor, project.budgetMaxMinor, project.currency);
+  const depositSucceeded = payment?.status === "SUCCEEDED";
 
   return (
     <main className="workspace-shell">
@@ -94,6 +105,41 @@ export default async function ProjectPublishPage({ params }: PublishPageProps) {
                   : null
               }
             />
+          </section>
+        ) : null}
+
+        {published ? (
+          <section className="project-form" data-testid="publish-result">
+            <h2 className="subsection-title">已发布</h2>
+            <p className="form-message success" role="status">
+              项目状态为 OPEN，发布于{" "}
+              {project.publishedAt ? momentFormat.format(project.publishedAt) : "—"}。
+              S1 不提供下架或修改已公开内容的动作。
+            </p>
+            <Link className="back-link" href={`/projects/${project.id}`}>
+              查看招募视图（与已登录用户看到的完全一致）→
+            </Link>
+          </section>
+        ) : locked ? (
+          <section className="project-form">
+            <h2 className="subsection-title">脱敏预览与发布</h2>
+            {!depositSucceeded ? (
+              <p className="form-message error" role="alert" data-error-code="PAYMENT_REQUIRED">
+                发布前需要先完成企业模拟定金。
+              </p>
+            ) : !lockedVersion?.document ? (
+              <p className="form-message error" role="alert" data-error-code="INVALID_SOURCE">
+                无法读取锁定的 Spec 版本内容，请联系本地环境维护者。
+              </p>
+            ) : (
+              <PublishForm
+                projectId={project.id}
+                version={project.version}
+                lockedSpecVersionId={lockedVersion.id}
+                lockedTitle={project.title}
+                lockedDocument={lockedVersion.document}
+              />
+            )}
           </section>
         ) : null}
       </section>
