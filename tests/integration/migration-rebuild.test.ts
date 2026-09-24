@@ -1,13 +1,11 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { parse } from "dotenv";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  loadLocalEnv,
-  requireLoopbackDatabaseUrl,
-} from "../helpers/local-env";
+import { requireLoopbackDatabaseUrl } from "../helpers/local-env";
 
 /**
  * Replays the full migration chain on a scratch database and asserts the
@@ -46,7 +44,10 @@ const connectionEnvKeys = ["SUPABASE_DB_ADMIN_URL", "SUPABASE_DB_SUPERUSER_URL"]
 function loadToolsEnv(): ToolsEnv {
   let fromFile: ToolsEnv = {};
   try {
-    fromFile = loadLocalEnv(resolve(import.meta.dirname, "../..")).tools;
+    // Parse the tools file directly: `loadLocalEnv` reads `.env.local` as well,
+    // and its failure would throw away a perfectly good tools file, leaving the
+    // suite skipped even though a usable superuser connection was configured.
+    fromFile = parse(readFileSync(resolve(import.meta.dirname, "../../.env.tools.local"), "utf8"));
   } catch {
     // No local tool file: fall back to the process environment below.
   }

@@ -7,7 +7,7 @@ import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { invokeAipmWithDatabase } from "@/modules/aipm/invocation";
-import { createMockAipmGateway } from "@/modules/aipm/mock-gateway";
+import { createMockAipmGateway, mockAipmGateway } from "@/modules/aipm/mock-gateway";
 import type { AipmRequest } from "@/modules/aipm/contract";
 import type { AipmGateway } from "@/modules/aipm/gateway";
 import { getProjectInterviewWithDatabase } from "@/modules/aipm/repository";
@@ -443,6 +443,91 @@ describe("AIPM interview boundary", () => {
     const after = await storedPayloads(enterpriseA, project.id);
     expect(after.messages).toHaveLength(40);
     expect(after.project.version).toBe(versionBefore + 2);
+  });
+
+  it("answers every round admitted before the cap, even when the turns overlap", async () => {
+    const project = await createDraft();
+    await invokeAipmWithDatabase(
+      database,
+      enterpriseA,
+      createMockAipmGateway(),
+      turnInput(project.id, project.version),
+    );
+
+    const interview = await storedPayloads(enterpriseA, project.id);
+    if (!interview.sessionId) throw new Error("The first turn must create a session.");
+
+    // 36 rows in the alternating shape a real session has, so three more rounds fit.
+    await admin`
+      insert into app.aipm_messages (id, session_id, sequence, role, content)
+      select gen_random_uuid(), ${interview.sessionId}, g,
+        case when g % 2 = 1 then 'USER' else 'ASSISTANT' end, '填充消息'
+      from generate_series(3, 36) as g
+    `;
+
+    // Hold every answer until all three rounds have begun, so they really overlap.
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started: string[] = [];
+    const gatedGateway = {
+      async invoke(request: Parameters<typeof mockAipmGateway.invoke>[0]) {
+        started.push(request.invocationId);
+        await gate;
+        return mockAipmGateway.invoke(request);
+      },
+    };
+    const waitForStarts = async (count: number) => {
+      for (let attempt = 0; attempt < 300 && started.length < count; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(started).toHaveLength(count);
+    };
+
+    const first = invokeAipmWithDatabase(
+      database,
+      enterpriseA,
+      gatedGateway,
+      turnInput(project.id, interview.project.version),
+    );
+    await waitForStarts(1);
+
+    const second = invokeAipmWithDatabase(
+      database,
+      enterpriseA,
+      gatedGateway,
+      turnInput(project.id, (await storedPayloads(enterpriseA, project.id)).project.version),
+    );
+    await waitForStarts(2);
+
+    const third = invokeAipmWithDatabase(
+      database,
+      enterpriseA,
+      gatedGateway,
+      turnInput(project.id, (await storedPayloads(enterpriseA, project.id)).project.version),
+    );
+    await waitForStarts(3);
+
+    release();
+
+    // Each of the three admitted rounds must store its answer. Refusing one of
+    // them at the cap would leave its user message stranded forever.
+    const settled = await Promise.allSettled([first, second, third]);
+    expect(settled.map((result) => result.status)).toEqual([
+      "fulfilled",
+      "fulfilled",
+      "fulfilled",
+    ]);
+
+    const after = await storedPayloads(enterpriseA, project.id);
+    const roles = after.messages.map((message) => message.role);
+    // The three begins land their USER rows first, then the three answers follow.
+    // Nothing is left trailing, and no USER row is without its ASSISTANT answer.
+    expect(roles.slice(-3)).toEqual(["ASSISTANT", "ASSISTANT", "ASSISTANT"]);
+    expect(roles.filter((role) => role === "USER")).toHaveLength(
+      roles.filter((role) => role === "ASSISTANT").length,
+    );
   });
 
   it("stores a validated proposal that only the owner can read back", async () => {
