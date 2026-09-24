@@ -1,31 +1,25 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { signOutAction } from "@/app/actions/auth";
+import { HomePage } from "@/app/home-page";
 import { getActorById } from "@/modules/identity/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+type HomeProps = { searchParams: Promise<{ intent?: string }> };
+
+export default async function Home({ searchParams }: HomeProps) {
   const userId = await getVerifiedUserId();
-  if (!userId) redirect("/sign-in");
+  if (!userId) return <HomePage />;
 
   const actor = await getActorById(userId);
-  if (!actor) redirect("/onboarding");
-  if (actor.status === "DISABLED") redirect("/onboarding");
+  const { intent } = await searchParams;
+  const requestedRole = intent === "requester" ? "ENTERPRISE" : intent === "builder" ? "BUILDER" : null;
+  if (!actor || actor.status === "DISABLED" || (requestedRole && !actor.roles.includes(requestedRole))) {
+    redirect(requestedRole ? `/onboarding?intent=${intent}` : "/onboarding");
+  }
+  if (requestedRole === "ENTERPRISE") redirect("/enterprise/projects");
+  if (requestedRole === "BUILDER") redirect("/projects");
   if (actor.roles.includes("ENTERPRISE")) redirect("/enterprise/projects");
-
-  return (
-    <main className="auth-shell">
-      <section className="panel" aria-labelledby="page-title">
-        <p className="eyebrow">Builder</p>
-        <h1 id="page-title" className="section-title">已登录</h1>
-        <p className="lede">接单功能将在后续切片开放。</p>
-        <p><Link className="text-button" href="/projects">浏览招募中的项目</Link></p>
-        <p><Link className="text-button" href="/onboarding">增加企业身份</Link></p>
-        <form action={signOutAction}><button className="button secondary">退出登录</button></form>
-      </section>
-    </main>
-  );
+  redirect("/projects");
 }
