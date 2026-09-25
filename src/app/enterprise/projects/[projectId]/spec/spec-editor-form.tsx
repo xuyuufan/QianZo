@@ -78,30 +78,33 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
 
   // The click guard above cannot see the browser's Back/Forward buttons, which
   // move through the App Router's own client history. While there are unsaved
-  // edits, park a guard entry on top of the current one so the first Back or
-  // Forward can be intercepted: accepting leaves, dismissing re-parks the guard
-  // so the user stays on the page with their edits intact.
+  // edits, tag the *current* history entry with replaceState — never pushState,
+  // which would truncate the forward stack and break Forward for anyone who
+  // reached the editor with the Back button — and intercept popstate: landing
+  // on the tagged editor entry means Forward returned into the editor and is
+  // left alone, while landing anywhere else is a Back out of the editor and is
+  // confirmed. Cancelling sends the user forward again, which also never
+  // truncates anything.
   useEffect(() => {
     if (!unsaved) return;
     const guardState = { ...window.history.state, qianzoSpecEditorGuard: true };
-    let leaving = false;
-    window.history.pushState(guardState, "", window.location.href);
+    window.history.replaceState(guardState, "", window.location.href);
     const guardHistory = () => {
-      if (leaving) return;
-      if (window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) {
-        leaving = true;
-        window.history.go(-1);
-      } else {
-        window.history.pushState(guardState, "", window.location.href);
-      }
+      if (window.history.state?.qianzoSpecEditorGuard) return;
+      if (window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) return;
+      window.history.forward();
     };
     window.addEventListener("popstate", guardHistory);
     return () => {
       window.removeEventListener("popstate", guardHistory);
-      // Step back off the guard entry once the edits are saved or abandoned so
-      // Back keeps behaving normally and the entries do not accumulate.
+      // Clear the tag once the edits are saved or abandoned. replaceState keeps
+      // the current entry in place, so nothing jumps and no entries pile up.
       if (window.history.state?.qianzoSpecEditorGuard) {
-        window.history.back();
+        window.history.replaceState(
+          { ...window.history.state, qianzoSpecEditorGuard: undefined },
+          "",
+          window.location.href,
+        );
       }
     };
   }, [unsaved]);
