@@ -1,10 +1,12 @@
 # Qianzo 项目状态
 
-更新时间：2026-09-24（S1 完成本地实现与验收，并完成一轮代码质检修复；S0 历史见文末基线章节）
+更新时间：2026-09-26（Lovable UI 与后端对齐轮次完成本地实现与验收；S1 详细记录见下文，S0 历史见文末基线章节）
 
-当前分支：`feat/s1-spec-publish`（从包含 S0 的 `origin/main` 建立，本地领先 10 个提交，**尚未推送**；按 S1 约定以 squash merge 合入 `main`）
+当前分支：`feat/lovable-ui-parity`（从 `feat/s1-spec-publish` 的 `736c42c` 建立，本地领先该基址 14 个提交，**尚未推送**）。
 
-当前 Slice：S1「需求变成可招募项目」已完成本地实现、升级与空库重建验证；S2 未开始。
+上游分支：`feat/s1-spec-publish`（`736c42c`）已推送并对应 PR #2，仍待合并。
+
+当前 Slice：S1「需求变成可招募项目」已完成本地实现、升级与空库重建验证；本轮为 UI 对齐，不新增 Slice；S2 未开始。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
 
@@ -86,16 +88,16 @@ S1-06 的验收与文档提交见 `eb38dc6`。
 - Node.js 24.13.1，pnpm 11.19.0；Docker Desktop 4.91.0 / Engine 29.8.0；Supabase CLI 2.117.0；Playwright 1.63.0 / Chromium 153（均安装在 D 盘）。
 - `origin` 为 `https://github.com/xuyuufan/QianZo.git`（私有）。
 - PR #1（S0）已由用户 merge，`origin/main` 现为 `08bf24b`，已包含完整 S0。
-- `feat/s1-spec-publish` 从 `origin/main` 建立，本地领先 10 个提交（S1 规划与六个实施任务、S1-06 文档，以及本轮质检修复的生产代码、测试与本文档三条），**尚未推送**；S1 约定以 squash merge 合入 `main`。
+- `feat/s1-spec-publish` 从 `origin/main` 建立，本地领先 10 个提交（S1 规划与六个实施任务、S1-06 文档，以及本轮质检修复的生产代码、测试与本文档三条）；**已推送**（`origin/feat/s1-spec-publish` = `736c42c`）并对应 PR #2，仍待合并；S1 约定以 squash merge 合入 `main`。
 
-## UI 重做评估（2026-09-24，设计已存档，未开工）
+## UI 重做评估（2026-09-24，设计已存档；已被 2026-09-25 UI 接入取代）
 
 后端已完成的情况下，用户提出重新做 UI。经架构师只读静态评估（团队协作），结论与设计存档在 **[UI_REWORK_DESIGN.md](UI_REWORK_DESIGN.md)**。
 
 - **结论**：UI 与后端完全解耦——重做 UI **无需改动** `src/modules/**`、`src/platform/**` 或 9 条 migration；单元 82 例与集成 112 例天然不受影响，仅 5 个 E2E 用例必然需要同步修改。
 - **已决定**：档位取 **B 档（页面结构与信息架构重做）**，仍保持 Server Component 服务端取数与服务层授权；E2E **不单独立项**加固，改为「改哪一页就顺手补 `data-testid` 并同步改对应 spec」；契约保护措施（字段名常量化 + Action 入口断言）**暂不做**；**暂不开工**。
-- **待拍板**：UI 技术栈。存档文档推荐 Tailwind v4 + shadcn/ui（本项目 RSC/client 边界早已落在 11 个表单上，故组件库的边际客户端渗透为零），回退方案为纯 CSS Modules；MUI 会把全局导航壳推向客户端、并有诱发取数下沉的风险；Ant Design 因 `<Form>` 自管字段、不写入原生 `FormData`，会直接打断 `formData.get` 契约，已排除。
-- 该文档是**设计草案，未生效**，不影响当前 S1 基线。开工前需先拍板技术栈。
+- **当时待拍板、现已落地**：UI 技术栈。存档文档推荐 Tailwind v4 + shadcn/ui（本项目 RSC/client 边界早已落在 11 个表单上，故组件库的边际客户端渗透为零），回退方案为纯 CSS Modules；MUI 会把全局导航壳推向客户端、并有诱发取数下沉的风险；Ant Design 因 `<Form>` 自管字段、不写入原生 `FormData`，会直接打断 `formData.get` 契约，已排除。
+- 本节为历史评估记录：其「未开工 / 待拍板」状态随后由 2026-09-25 的 UI 接入完成——技术栈最终采用 Tailwind v4 + Radix Slot + CVA，且 `src/modules/**`、`src/platform/**` 与 migration 均未改动，见下节「Qianzo Flow UI 接入」。
 
 ## 已知限制与交接
 
@@ -141,7 +143,7 @@ S1-06 的验收与文档提交见 `eb38dc6`。
 - 已完成公开品牌首页、真实登录意图与 onboarding 导航、企业项目列表/创建/详情、访谈工作台、全字段结构化 Spec 编辑、候选采用/只读历史/锁定、Mock 定金、文字级脱敏编辑、发布确认、招募大厅与完整脱敏详情。
 - 写入继续经过现有 Server Actions、身份和资源校验；本轮没有新增 API、业务表、migration 或业务状态。脱敏招募详情只显示白名单快照。
 - README 演示步骤已从旧 JSON 编辑说明改为结构化 Spec 与脱敏流程；S1 切片和 UI 设计说明已同步当前实现。
-- 浏览器检查：桌面首页 1440×900、手机首页 390×844，以及 Spec 工作台和招募列表/详情的桌面与手机视口；身份卡布局、Spec 双栏/单列切换、招募列表/详情均无横向溢出；键盘顺序导航与 Enter 跳转通过；`prefers-reduced-motion: reduce` 下动画时长为 0.01ms。首页没有媒体或 Lovable 专用资源依赖，CSS 品牌图形可直接显示。
+- 浏览器检查：桌面首页 1440×900、手机首页 390×844，以及 Spec 工作台和招募列表/详情的桌面与手机视口；身份卡布局、Spec 双栏/单列切换、招募列表/详情均无横向溢出；键盘顺序导航与 Enter 跳转通过；`prefers-reduced-motion: reduce` 下动画时长为 0.01ms。首页此阶段以 CSS 品牌图形呈现、无外部媒体依赖；随后一轮 `feat/lovable-ui-parity` 已恢复 Lovable 原始海报与视频素材（`public/assets/qianzo-mechanical-light-poster.webp` 与 `qianzo-mechanical-light.mp4`），并将 E2E 套件扩充至 11 个用例。
 
 ### 本轮实际验证
 
@@ -150,7 +152,26 @@ S1-06 的验收与文档提交见 `eb38dc6`。
 - `corepack pnpm test`：10 个文件，91 个单元用例通过。
 - `corepack pnpm test:integration`：9 个文件，115 个真实本地 Supabase/PostgreSQL 用例通过。
 - `corepack pnpm build`：通过，11 条 App Router 路由。
-- `$env:CI='true'; corepack pnpm test:e2e`：9 个真实浏览器用例通过（41.1 秒）；强制使用本轮新生产构建与服务，覆盖登录/onboarding、越权拒绝、完整 S0→S1 发布及招募链路、响应隐私和移动布局。
+- `$env:CI='true'; corepack pnpm test:e2e`：9 个真实浏览器用例通过（41.1 秒）；强制使用本轮新生产构建与服务，覆盖登录/onboarding、越权拒绝、完整 S0→S1 发布及招募链路、响应隐私和移动布局。（该数字对应本轮；随后 `feat/lovable-ui-parity` 轮新增 `tests/e2e/home.spec.ts` 的 5 个用例，套件扩至 11 例，明细见下文对齐轮次。）
 - 桌面/手机截图由 E2E 生成并已人工查看，仅保留在 Git 忽略的 `test-results/`。
 
 本地 Supabase 在本任务中启动并通过 `db:prepare`、`demo:seed`；没有清空原有合成数据库。当前实现到项目 OPEN 与招募浏览为止，申请、选人、Builder 押金和开工仍属于尚未开始的 S2。
+
+## Lovable UI 与后端对齐（`feat/lovable-ui-parity`，2026-09-26）
+
+在 `feat/s1-spec-publish` 的 `736c42c` 之上，把 Lovable 的视觉与信息架构对齐到既有 S0/S1 服务层。本轮**没有**新增 API、业务表、migration 或业务状态；`src/modules/**`、`src/platform/**` 与 `supabase/migrations/**` **零改动**（`git diff --stat 736c42c..HEAD -- src/modules src/platform supabase/migrations` 输出为空）。
+
+- **覆盖范围**：公开品牌首页（Lovable 原始海报与视频，含视频加载失败时回退海报）、真实登录意图（`intent`）与 onboarding 导航、企业项目列表与状态筛选、项目总览、访谈工作台、全字段结构化 Spec 编辑、候选采用/只读历史/锁定、Mock 定金、文字级脱敏编辑、发布确认、招募大厅与脱敏详情。
+- **表单契约审计**：11 组表单的字段名与 11 个 Server Action 的 `formData.get(...)` 读取键**逐一比对一致**，含 `expectedVersion`、`specVersionId`、`sourceMessageId`、`lockedSpecVersionId`、`maskedTitle`、`maskedDocument`、`confirmed` 等隐藏字段与脱敏字段。UI 重做最容易静默断链的正是这类字符串契约（`typecheck` 覆盖不到），故单列此项。
+- **锁定后入口**：访谈、采用候选、另存新版本、改标题/原始需求、改预算全部降级为只读提示；发布流程的定金与发布两步保留（S1 设计内），服务端仍对锁定前的陈旧 DOM 返回 `SPEC_LOCKED` 兜底。
+- **边界路径复核**：`?version=` 深链的非法/跨项目/不存在版本均走 `notFound()`(404)；`intent` 非法值被降级忽略，不构成开放重定向，也不影响权限；客户端传入非法 `maskedDocument` JSON 收敛为 `INVALID_JSON` / `INVALID_DOCUMENT` 用户可读错误，不产生 500，也不泄露堆栈。
+
+### 本轮实际验证（2026-09-26，Windows 本机）
+
+- `corepack pnpm typecheck`：通过。`corepack pnpm lint`：通过（无警告）。
+- `corepack pnpm test`：10 个文件、91 个单元用例通过。
+- `corepack pnpm test:integration`：9 个文件、115 个真实本地 Supabase/PostgreSQL 用例通过。
+- `corepack pnpm build`：通过，11 条 App Router 路由（`/`、`/_not-found`、`/enterprise/projects`、`/enterprise/projects/[projectId]`、`/enterprise/projects/[projectId]/publish`、`/enterprise/projects/[projectId]/spec`、`/enterprise/projects/new`、`/onboarding`、`/projects`、`/projects/[projectId]`、`/sign-in`）。
+- `corepack pnpm start` + `corepack pnpm test:e2e`：**11 个真实浏览器用例全部通过**（约 1.8 分钟），`/sign-in` 返回 200。E2E 运行在**生产构建与生产服务**上，覆盖完整 S0→S1 主链路（创建草稿 → 两轮访谈 → 生成候选 → 采用 → 手工另存 → 锁定 → 定金 → 文字脱敏 → 发布 → 招募浏览）、登录意图与 onboarding、越权拒绝、响应隐私与桌面/平板/手机布局。用例分布：`aipm-interview` 1、`home` 5、`identity` 4、`projects` 1。截图仍只落在 Git 忽略的 `test-results/`。
+- **独立复核（另一执行者，非本轮实现者）**：独立复跑 `typecheck`、`lint`、`test`（10/91）、`test:integration`（9/115），结论一致；对 E2E 断言逐条比对**未发现变松或换语义**（全文无 `waitForTimeout` / `force: true` / `skip` / `only`），隐私类断言（响应体不含原始需求、访谈正文、企业邮箱与 `ZZSECRET` 标记）**原样保留**；`tests/helpers/ui-visual-fixtures.ts` 的合成夹具仅用于版式截屏与列表计数，主链路仍由 UI 驱动真实 Server Action，夹具行由既有 `clearDemoBusinessData`（含 `spec_versions`）清理，无残留污染。
+- **已知测试缺口（本轮未补，非回归）**：`?version=` 深链非法输入的页面级断言、`publishProjectAction` 的 action 级错误映射、招募详情渲染 HTML 对企业 `displayName` 的直接负向断言。三者当前分别由仓储归属校验、代码路径审查与白名单/DTO 精确断言间接保证。
