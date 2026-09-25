@@ -124,3 +124,24 @@ S1-06 的验收与文档提交见 `eb38dc6`。
 - 第二个执行者在同机复跑 `typecheck`/`lint`/`test`/`test:integration`/`build`/`test:e2e`，结果与上一轮一致（23 个集成用例、3 个 E2E、7 条路由）。
 - PR #1 上的 7 条评审（1×P1 + 6×P2）全部修复并逐条回复，各自独立提交：破坏性测试前校验 loopback（`669d54a`）、runtime 表级 INSERT 覆盖列级授权（`6ee3092`）、onboarding 会话过期（`1036031`）、ACTIVE 用户重复 onboarding（`c15124b`）、运行时角色成员关系与临时表权限（`da289ba`）、复用角色的直接授权（`11de376`）。
 - 修复后集成用例增至 34 个，E2E 增至 4 个；S0 规格第 6 节同步补记权限边界。PR #1 随后由用户以 squash merge 合入 `main`。
+
+## Qianzo Flow UI 接入（2026-09-25）
+
+基于已含 S1 的 `feat/lovable-ui-s0-s1` 分支，将 Qianzo Flow 视觉接入既有 Next.js App Router 和 S0/S1 服务。Lovable 源码冻结于 `a0c5a38a88db7768e84e13b51d263b0aebcd5acc`；本轮没有复制其认证、路由、localStorage 或 AI 数据层。
+
+- 已完成公开品牌首页、真实登录意图与 onboarding 导航、企业项目列表/创建/详情、访谈工作台、全字段结构化 Spec 编辑、候选采用/只读历史/锁定、Mock 定金、文字级脱敏编辑、发布确认、招募大厅与完整脱敏详情。
+- 写入继续经过现有 Server Actions、身份和资源校验；本轮没有新增 API、业务表、migration 或业务状态。脱敏招募详情只显示白名单快照。
+- README 演示步骤已从旧 JSON 编辑说明改为结构化 Spec 与脱敏流程；S1 切片和 UI 设计说明已同步当前实现。
+- 浏览器检查：桌面首页 1440×900、手机首页 390×844，以及 Spec 工作台和招募列表/详情的桌面与手机视口；身份卡布局、Spec 双栏/单列切换、招募列表/详情均无横向溢出；键盘顺序导航与 Enter 跳转通过；`prefers-reduced-motion: reduce` 下动画时长为 0.01ms。首页没有媒体或 Lovable 专用资源依赖，CSS 品牌图形可直接显示。
+
+### 本轮实际验证
+
+- `corepack pnpm typecheck`：通过。
+- `corepack pnpm lint`：通过。
+- `corepack pnpm test`：10 个文件，91 个单元用例通过。
+- `corepack pnpm test:integration`：9 个文件，115 个真实本地 Supabase/PostgreSQL 用例通过。
+- `corepack pnpm build`：通过，11 条 App Router 路由。
+- `$env:CI='true'; corepack pnpm test:e2e`：9 个真实浏览器用例通过（41.1 秒）；强制使用本轮新生产构建与服务，覆盖登录/onboarding、越权拒绝、完整 S0→S1 发布及招募链路、响应隐私和移动布局。
+- 桌面/手机截图由 E2E 生成并已人工查看，仅保留在 Git 忽略的 `test-results/`。
+
+本地 Supabase 在本任务中启动并通过 `db:prepare`、`demo:seed`；没有清空原有合成数据库。当前实现到项目 OPEN 与招募浏览为止，申请、选人、Builder 押金和开工仍属于尚未开始的 S2。

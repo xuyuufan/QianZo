@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import postgres from "postgres";
 
 import { clearDemoBusinessData } from "../helpers/demo-data";
@@ -83,6 +83,28 @@ test("a draft becomes a published recruitment project end to end", async ({
 
   await page.getByRole("link", { name: "需求访谈与 Spec" }).click();
   await expect(page).toHaveURL(new RegExp(`${projectPath.replaceAll("/", "\\/")}/spec$`));
+
+  // Inspect the desktop two-column workbench before exercising its mobile stack.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const desktopInterviewColumn = await page.locator(".spec-interview-column").boundingBox();
+  const desktopEditorColumn = await page.locator(".spec-editor-column").boundingBox();
+  expect(desktopInterviewColumn).not.toBeNull();
+  expect(desktopEditorColumn).not.toBeNull();
+  expect(desktopEditorColumn!.x).toBeGreaterThan(desktopInterviewColumn!.x);
+  expect(Math.abs(desktopEditorColumn!.y - desktopInterviewColumn!.y)).toBeLessThanOrEqual(1);
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("spec-workbench-desktop.png") });
+
+  // Keep the full S0/S1 workflow on a phone-sized viewport through the Spec
+  // editor and recruitment pages so the responsive stack is exercised too.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const interviewColumn = await page.locator(".spec-interview-column").boundingBox();
+  const editorColumn = await page.locator(".spec-editor-column").boundingBox();
+  expect(interviewColumn).not.toBeNull();
+  expect(editorColumn).not.toBeNull();
+  expect(editorColumn!.y).toBeGreaterThan(interviewColumn!.y);
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("spec-workbench-mobile.png") });
 
   await page
     .getByLabel("访谈回复")
@@ -306,7 +328,13 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(builderPage).toHaveURL(/\/projects$/);
 
   // The published project shows up in the recruitment view, masked.
+  await builderPage.setViewportSize({ width: 1440, height: 900 });
   await builderPage.goto("/projects");
+  await expectNoHorizontalOverflow(builderPage);
+  await builderPage.screenshot({ path: test.info().outputPath("recruitment-list-desktop.png") });
+  await builderPage.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(builderPage);
+  await builderPage.screenshot({ path: test.info().outputPath("recruitment-list-mobile.png") });
   await expect(builderPage.getByRole("link", { name: /E2E 招募项目（脱敏）/ })).toBeVisible();
   const recruitmentSearch = builderPage.getByLabel("搜索招募项目");
   await recruitmentSearch.fill("需求与交付协作");
@@ -323,6 +351,11 @@ test("a draft becomes a published recruitment project end to end", async ({
   expect(recruitmentBody).not.toContain(privateMessage);
   expect(recruitmentBody).not.toContain("qianzo.local");
   await expect(builderPage.getByRole("heading", { name: "E2E 招募项目（脱敏）" })).toBeVisible();
+  await expectNoHorizontalOverflow(builderPage);
+  await builderPage.screenshot({ path: test.info().outputPath("recruitment-detail-mobile.png") });
+  await builderPage.setViewportSize({ width: 1440, height: 900 });
+  await expectNoHorizontalOverflow(builderPage);
+  await builderPage.screenshot({ path: test.info().outputPath("recruitment-detail-desktop.png") });
   const publishedBudget = builderPage.locator("p").filter({ hasText: "参考预算" });
   await expect(publishedBudget).toContainText("¥1000.00 – ¥2500.50");
   // The cycle comes from the last milestone of the locked document (30 days).
@@ -339,3 +372,11 @@ test("a draft becomes a published recruitment project end to end", async ({
   expect(recruitmentBody).not.toContain("未发布");
   await builderContext.close();
 });
+
+async function expectNoHorizontalOverflow(page: Page) {
+  const { clientWidth, scrollWidth } = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+}

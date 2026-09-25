@@ -138,7 +138,7 @@ Spec 版本分配在 Project 行锁内进行，最大版本号加一并以 UNIQU
 
 ### 编辑与锁定
 
-- 审阅页面提供完整结构化预览与可编辑表单；首轮可使用带字段错误提示的 JSON 编辑区，但必须能通过 UI 修改并保存，不以直接改库代替。
+- 审阅页面提供完整结构化预览与覆盖 SpecDocumentV1 全部字段的可编辑表单。当前 UI 使用按章节组织的字段、条目和里程碑编辑器，保存前显示对应字段错误；不需要直接编辑 JSON 或数据库。
 - 手工保存和采用都新增 SpecVersion；旧版本不覆盖、不删除。手工保存不伪装成采用已有候选。
 - 共享校验器完整落实总纲附录 A：必要内容非空、元素 ID 稳定且无重复、引用有效、至少一条里程碑验收标准、dueAfterDays 为正整数并严格递增。Schema 合法不等于企业已经确认需求。
 - 锁定必须由企业明确确认当前已保存 Spec，验证版本一致及参考预算完整。事务设置 locked 指针/时间、递增版本；项目仍是 DRAFT，不新增 LOCKED 状态。
@@ -263,3 +263,9 @@ S1 已于 2026-09-24 按上述六个任务实施完成，实施顺序、每个�
 - `ON DELETE RESTRICT` 无法被 `DEFERRABLE` 延迟检查，因此 `projects` 指向 `spec_versions` 的两个复合外键改为 `NO ACTION + DEFERRABLE INITIALLY DEFERRED`，使带历史的项目能在同一事务内删除；其余外键保持 `RESTRICT`。
 - 空库重建的验证在独立 scratch 数据库上完成，仅用最小 `auth.users` 桩件替代 Supabase 平台对象；`supabase db reset --local` 未执行，以遵守「不擅自清空用户本地草稿」。
 - E2E 对生产构建运行：`playwright.config.ts` 的 `webServer.command` 为 `corepack pnpm build && corepack pnpm start`，能在全新环境自行构建并启动生产服务；`next dev` 冷启动会现场编译 Server Action 并造成首个用例假失败，生产服务无此抖动。本机非 CI 环境仍保留 `reuseExistingServer`，可复用已运行的服务。
+
+## UI 接入补充（2026-09-25）
+
+本 Slice 的页面现已接入 Qianzo Flow 视觉，并使用现有 S0/S1 服务端数据与动作完成「真实登录 → 草稿 → Mock 访谈 → 结构化 Spec 与版本 → 锁定 → 企业 Mock 定金 → 结构化脱敏 → 发布 → Builder 招募浏览」。完整 Spec 与每条验收标准/验证方法均可编辑或查看；脱敏编辑只开放文字。接入设计与本轮实际验证记录见 [UI 接入设计](../../UI_REWORK_DESIGN.md) 和 [项目状态](../../PROJECT_STATUS.md)。
+
+桌面/手机布局、键盘导航、减少动态效果及素材独立性由 E2E 覆盖；本轮整套 E2E 使用新生产构建和真实本地 Supabase/PostgreSQL。未增加数据库表、migration 或 HTTP API，也未开始 S2。
