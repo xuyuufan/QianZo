@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Building2, Code2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,27 @@ export function HomePage() {
   const [transitioning, setTransitioning] = useState<Role | null>(null);
   const activeRole = hoverRole ?? selectedRole;
 
+  // The poster carries the first paint, so the 7.8MB clip is only requested
+  // once the desktop breakpoint matches. Below `md` the element is css-hidden
+  // but would still autoplay and download the whole video for a frame the user
+  // never sees. The media query is known only on the client, so the first
+  // render (which server and client agree on) has no source yet.
+  const [showVideo, setShowVideo] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   useEffect(() => {
-    const video = document.querySelector<HTMLVideoElement>(".qianzo-film");
-    const source = video?.querySelector("source");
+    const query = window.matchMedia("(min-width: 768px)");
+    const update = () => setShowVideo(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (!showVideo) return;
+    const video = videoRef.current;
     if (!video) return;
+    const source = video.querySelector("source");
     const hideFailedVideo = () => {
       video.style.display = "none";
     };
@@ -35,7 +52,7 @@ export function HomePage() {
       source?.removeEventListener("error", hideFailedVideo);
       source?.removeEventListener("abort", hideFailedVideo);
     };
-  }, []);
+  }, [showVideo]);
 
   const chooseRole = (role: Role) => {
     if (transitioning) return;
@@ -67,8 +84,9 @@ export function HomePage() {
         unoptimized
       />
       <video
+        ref={videoRef}
         className="qianzo-film absolute inset-0 -z-20 hidden size-full object-cover grayscale md:block"
-        autoPlay
+        autoPlay={showVideo}
         muted
         loop
         playsInline
@@ -79,10 +97,12 @@ export function HomePage() {
         }}
         aria-hidden="true"
       >
-        <source
-          src="/assets/qianzo-mechanical-light.mp4"
-          type="video/mp4"
-        />
+        {showVideo ? (
+          <source
+            src="/assets/qianzo-mechanical-light.mp4"
+            type="video/mp4"
+          />
+        ) : null}
       </video>
       <div className="qianzo-shade absolute inset-0 -z-10" aria-hidden="true" />
       <div className="qianzo-grain pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
