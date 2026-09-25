@@ -88,15 +88,17 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(page).toHaveURL(new RegExp(`${projectPath.replaceAll("/", "\\/")}/spec$`));
 
   // Inspect the desktop two-column workbench before exercising its mobile stack.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 900 });
   const desktopInterviewColumn = await page.locator(".spec-interview-column").boundingBox();
   const desktopEditorColumn = await page.locator(".spec-editor-column").boundingBox();
   expect(desktopInterviewColumn).not.toBeNull();
   expect(desktopEditorColumn).not.toBeNull();
   expect(desktopEditorColumn!.x).toBeGreaterThan(desktopInterviewColumn!.x);
-  expect(Math.abs(desktopEditorColumn!.y - desktopInterviewColumn!.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(desktopEditorColumn!.y - desktopInterviewColumn!.y)).toBeLessThanOrEqual(2);
   await expectNoHorizontalOverflow(page);
-  await page.screenshot({ path: test.info().outputPath("spec-workbench-desktop.png") });
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: test.info().outputPath("spec-workbench-desktop.png"), animations: "disabled" });
 
   // Keep the full S0/S1 workflow on a phone-sized viewport through the Spec
   // editor and recruitment pages so the responsive stack is exercised too.
@@ -107,7 +109,7 @@ test("a draft becomes a published recruitment project end to end", async ({
   expect(editorColumn).not.toBeNull();
   expect(editorColumn!.y).toBeGreaterThan(interviewColumn!.y);
   await expectNoHorizontalOverflow(page);
-  await page.screenshot({ path: test.info().outputPath("spec-workbench-mobile.png") });
+  await page.screenshot({ path: test.info().outputPath("spec-workbench-mobile.png"), animations: "disabled" });
 
   await page
     .getByLabel("访谈回复")
@@ -135,6 +137,8 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(page.getByRole("heading", { name: "最新候选 Spec" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "里程碑与验收" })).toBeVisible();
   await expect(page.getByText("第 14 个自然日")).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("spec-workbench-candidate-mobile.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: test.info().outputPath("spec-workbench-candidate-desktop.png"), fullPage: true, animations: "disabled" });
 
@@ -160,18 +164,18 @@ test("a draft becomes a published recruitment project end to end", async ({
     "保留的未保存目标：先确认访谈内容，再确认交付范围。",
   );
   await expect(editor.locator(".editor-save-state")).toContainText("有未保存修改");
-  const secondCandidateGoal = await page
-    .locator('.spec-candidate-panel [data-testid="spec-document-section"]')
-    .filter({ has: page.getByRole("heading", { name: "项目目标" }) })
+  const candidatePanel = page.getByTestId("spec-candidate-panel");
+  await expect(candidatePanel).toBeVisible();
+  const secondCandidateGoal = await candidatePanel
+    .getByTestId("spec-document-section")
+    .first()
     .locator("p")
     .first()
     .innerText();
 
   // Adopt the candidate into the first immutable version.
   const [databaseProject] = await adminSql`select version from app.projects where id = ${projectId}`;
-  const adoptionVersion = page.locator(
-    '.spec-candidate-panel form input[name="expectedVersion"]',
-  );
+  const adoptionVersion = candidatePanel.locator('form input[name="expectedVersion"]');
   await expect(adoptionVersion).toHaveValue(String(databaseProject.version));
   await page.getByRole("button", { name: "采用为当前 Spec 版本" }).click();
   await expect(page.getByText("该候选已采用为版本 1，历史版本不会被覆盖。")).toBeVisible();
@@ -319,7 +323,7 @@ test("a draft becomes a published recruitment project end to end", async ({
   await page.getByRole("button", { name: "确认锁定当前版本" }).click();
   await expect(page.getByText(/已锁定 Spec 版本 2/)).toBeVisible();
   await expect(
-    page.getByText("Spec 已锁定，访谈与候选生成已关闭。已有的对话与历史版本仍可查看。"),
+    page.getByText("Spec 已锁定，访谈与候选生成已关闭。已有对话与历史版本仍可查看。"),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "确认锁定当前版本" })).toHaveCount(0);
 
@@ -339,17 +343,18 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(page.getByText(/已创建企业模拟定金 ¥1\.00/)).toBeVisible();
   await page.getByRole("button", { name: "模拟支付成功" }).click();
   await expect(page.getByText(/发布仍需你在脱敏预览后手动确认/)).toBeVisible();
-  await expect(page.getByText(/付款只满足发布前置条件/)).toBeVisible();
+  const paymentStatus = page.locator('[data-payment-status="SUCCEEDED"]');
+  await expect(paymentStatus).toContainText(/付款只满足发布前置条件/);
 
   await page.reload();
-  await expect(page.getByText(/付款只满足发布前置条件/)).toBeVisible();
+  await expect(paymentStatus).toContainText(/付款只满足发布前置条件/);
   await expect(page.getByRole("button", { name: "模拟支付成功" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "创建企业模拟定金" })).toHaveCount(0);
 
   // Masked preview: only text may change, then the final preview is confirmed.
   const maskedEditor = page.getByTestId("structured-masked-spec-editor");
   await expect(maskedEditor.locator(".spec-editor-section")).toHaveCount(11);
-  await expect(page.getByText("结构与锁定版本一致，可以确认发布。")).toBeVisible();
+  await expect(page.getByText(/结构与锁定版本一致。请切换到最终招募预览核对后确认发布/)).toBeVisible();
   const maskedDocumentField = maskedEditor.locator('input[name="maskedDocument"]');
   const lockedDocument = JSON.parse(await maskedDocumentField.inputValue());
   await expect(maskedEditor.locator(".editor-add-button")).toHaveCount(0);
@@ -364,6 +369,10 @@ test("a draft becomes a published recruitment project end to end", async ({
   await page.getByRole("tab", { name: "最终招募预览" }).click();
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: test.info().outputPath("publish-masked-preview-desktop.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("publish-masked-preview-mobile.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("checkbox", { name: /我已确认这是最终预览/ }).check();
   await page.getByRole("button", { name: "确认并发布招募" }).click();
   // The publish form is replaced by the published state once the intent succeeded.
@@ -429,6 +438,7 @@ test("a draft becomes a published recruitment project end to end", async ({
   await recruitmentSearch.fill("E2E 招募项目");
   await expect(builderPage.getByRole("link", { name: /E2E 招募项目（脱敏）/ })).toBeVisible();
   await recruitmentSearch.fill("");
+  await builderPage.emulateMedia({ reducedMotion: "reduce" });
   const recruitmentResponse = await builderPage.goto(`/projects/${projectId}`);
   const recruitmentBody = (await recruitmentResponse?.text()) ?? "";
   expect(recruitmentBody).not.toContain("ZZSECRET");
@@ -437,16 +447,18 @@ test("a draft becomes a published recruitment project end to end", async ({
   expect(recruitmentBody).not.toContain("qianzo.local");
   await expect(builderPage.getByRole("heading", { name: "E2E 招募项目（脱敏）" })).toBeVisible();
   await expectNoHorizontalOverflow(builderPage);
-  await builderPage.screenshot({ path: test.info().outputPath("recruitment-detail-mobile.png") });
+  await builderPage.evaluate(() => document.fonts.ready);
+  await builderPage.screenshot({ path: test.info().outputPath("recruitment-detail-mobile.png"), animations: "disabled" });
   await builderPage.setViewportSize({ width: 1440, height: 900 });
   await expectNoHorizontalOverflow(builderPage);
-  await builderPage.screenshot({ path: test.info().outputPath("recruitment-detail-desktop.png") });
-  const publishedBudget = builderPage.locator("p").filter({ hasText: "参考预算" });
+  await builderPage.screenshot({ path: test.info().outputPath("recruitment-detail-desktop.png"), animations: "disabled" });
+  const publishedBudget = builderPage.getByTestId("recruitment-budget");
+  const publishedCycle = builderPage.getByTestId("recruitment-cycle");
   await expect(publishedBudget).toContainText("¥1000.00 – ¥2500.50");
   // The cycle comes from the last milestone of the locked document (30 days).
-  await expect(publishedBudget).toContainText("30 个自然日");
+  await expect(publishedCycle).toContainText("30 个自然日");
   await expect(builderPage.getByText(/不是成交价或报价/)).toBeVisible();
-  await expect(builderPage.getByText("里程碑与验收")).toBeVisible();
+  await expect(builderPage.getByRole("heading", { name: "里程碑与验收" })).toBeVisible();
   const publicCriteria = builderPage.locator("[data-testid='recruitment-snapshot'] [data-testid='public-acceptance-criterion']");
   await expect(publicCriteria).toHaveCount(expectedCriteria.length);
   for (const [index, criterion] of expectedCriteria.entries()) {

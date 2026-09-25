@@ -25,11 +25,15 @@ export function HomePage() {
       video.style.display = "none";
     };
     video.addEventListener("error", hideFailedVideo);
+    video.addEventListener("abort", hideFailedVideo);
     source?.addEventListener("error", hideFailedVideo);
+    source?.addEventListener("abort", hideFailedVideo);
     if (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) hideFailedVideo();
     return () => {
       video.removeEventListener("error", hideFailedVideo);
+      video.removeEventListener("abort", hideFailedVideo);
       source?.removeEventListener("error", hideFailedVideo);
+      source?.removeEventListener("abort", hideFailedVideo);
     };
   }, []);
 

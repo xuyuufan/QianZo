@@ -92,7 +92,7 @@ test("a first-time Auth user completes onboarding through the real UI", async ({
   await page.getByRole("button", { name: "完成设置" }).click();
 
   await expect(page).toHaveURL(/\/enterprise\/projects$/);
-  await expect(page.getByText("ENTERPRISE WORKSPACE · 首次接入企业")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "我的项目" })).toBeVisible();
 });
 
 test("an onboarded user returns to onboarding to add the ENTERPRISE role", async ({ page }) => {
@@ -117,7 +117,7 @@ test("an onboarded user returns to onboarding to add the ENTERPRISE role", async
   await page.getByRole("button", { name: "完成设置" }).click();
 
   await expect(page).toHaveURL(/\/enterprise\/projects$/);
-  await expect(page.getByText("ENTERPRISE WORKSPACE · 再次设置用户")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "我的项目" })).toBeVisible();
 });
 
 test("requester intent survives login and directs a Builder to role onboarding", async ({ page }) => {

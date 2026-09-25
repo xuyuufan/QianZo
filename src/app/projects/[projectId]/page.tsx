@@ -51,8 +51,8 @@ export default async function RecruitmentDetailPage({ params }: RecruitmentPageP
               已由需求方确认并发布的项目范围，可用于申请前评估。
             </p>
             <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 font-zh text-xs text-muted-foreground">
-              <span>参考预算 <strong className="font-normal text-foreground">{recruitment.budgetLabel}</strong></span>
-              <span>预计周期 <strong className="font-normal text-foreground">{recruitment.deliveryDays} 个自然日</strong></span>
+              <span data-testid="recruitment-budget">参考预算 <strong className="font-normal text-foreground">{recruitment.budgetLabel}</strong></span>
+              <span data-testid="recruitment-cycle">预计周期 <strong className="font-normal text-foreground">{recruitment.deliveryDays} 个自然日</strong></span>
               <span>发布于 {momentFormat.format(recruitment.publishedAt)}</span>
             </div>
           </div>
