@@ -118,6 +118,22 @@ export function SpecReviewWorkspace({
     setActivePanel(next);
   }
 
+  function selectVersion(versionId: string) {
+    setSelectedVersionId(versionId);
+    // The page already serves ?version= deep links, so keep the address in step
+    // with the record on screen: a reload, a copied URL or a return through
+    // history then reopens the same version instead of the current one.
+    // replaceState is a pure address-bar update, so the router does not treat it
+    // as a navigation and the in-page state (including unsaved edits) survives.
+    const url = new URL(window.location.href);
+    url.searchParams.set("version", versionId);
+    window.history.replaceState(
+      { ...window.history.state },
+      "",
+      `${url.pathname}${url.search}`,
+    );
+  }
+
   return (
     <section className="min-w-0" aria-label="Spec 工作区">
       <div className="flex flex-col gap-4 border-b border-border sm:flex-row sm:items-end sm:justify-between">
@@ -231,7 +247,7 @@ export function SpecReviewWorkspace({
                   key={version.id}
                   type="button"
                   aria-pressed={selectedVersion?.id === version.id}
-                  onClick={() => setSelectedVersionId(version.id)}
+                  onClick={() => selectVersion(version.id)}
                   className={`shrink-0 border px-3 py-2 font-brand text-xs transition-colors ${
                     selectedVersion?.id === version.id
                       ? "border-foreground bg-foreground text-background"
