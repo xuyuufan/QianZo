@@ -8,15 +8,17 @@ type ProjectHeaderProps = {
   label?: string;
   homeHref?: string;
   role?: "requester" | "builder";
+  fullBleed?: boolean;
 };
 
 export function ProjectHeader({
   label = "企业项目",
   homeHref = "/enterprise/projects",
   role = homeHref === "/projects" ? "builder" : "requester",
+  fullBleed = false,
 }: ProjectHeaderProps = {}) {
   return (
-    <header className="sticky top-0 z-20 -mx-[clamp(1rem,4vw,3.5rem)] border-b border-border bg-card/90 backdrop-blur-sm" aria-label={`${label}导航`}>
+    <header className={`${fullBleed ? "" : "-mx-[clamp(1rem,4vw,3.5rem)]"} sticky top-0 z-20 border-b border-border bg-card/90 backdrop-blur-sm`} aria-label={`${label}导航`}>
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
         <div className="flex min-w-0 items-center gap-6 sm:gap-8">
           <Link href="/" className="flex items-baseline gap-2" aria-label="千轴首页">

@@ -19,18 +19,21 @@ export default async function RecruitmentListPage() {
   const recruitments = await listOpenRecruitments(userId);
 
   return (
-    <main className="workspace-shell">
-      <ProjectHeader label="招募浏览" homeHref="/projects" />
-      <section className="workspace-content">
-        <div>
-          <p className="eyebrow">你好，{actor.displayName}</p>
-          <h1 className="section-title">招募中的项目</h1>
-        </div>
-        <p className="lede">
-          这里只展示企业确认过的脱敏范围与参考预算；申请与开工在后续切片提供。
-        </p>
-        <RecruitmentList recruitments={recruitments} />
-      </section>
-    </main>
+    <div className="qz-paper min-h-[100svh]">
+      <ProjectHeader label="招募浏览" homeHref="/projects" fullBleed />
+      <main className="qz-rise mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
+        <section aria-labelledby="recruitments-title">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="font-brand text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Open project index</p>
+              <h1 id="recruitments-title" className="mt-3 font-zh text-3xl font-normal sm:text-4xl">项目大厅</h1>
+              <p className="mt-3 font-zh text-sm text-muted-foreground">找到一个值得完成的项目</p>
+            </div>
+            <span className="font-brand text-xs text-muted-foreground">{String(recruitments.length).padStart(2, "0")} MATCHES</span>
+          </div>
+          <RecruitmentList recruitments={recruitments} />
+        </section>
+      </main>
+    </div>
   );
 }

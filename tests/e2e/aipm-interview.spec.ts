@@ -6,6 +6,7 @@ import postgres from "postgres";
 
 import { clearDemoBusinessData } from "../helpers/demo-data";
 import { loginDemoUser } from "../helpers/demo-login";
+import { insertVisualOpenProjects } from "../helpers/ui-visual-fixtures";
 import {
   loadLocalEnv,
   requireLoopbackApiUrl,
@@ -27,6 +28,7 @@ const adminSql = postgres(
   { max: 1, prepare: false },
 );
 let demoUserIds: string[] = [];
+let enterpriseAUserId: string;
 const builderOnlyEmail = `spec-builder-${Date.now()}@qianzo.test`;
 let builderOnlyUserId: string;
 
@@ -40,6 +42,7 @@ test.beforeAll(async () => {
   ]);
   demoUserIds = data.users.filter((user) => user.email && emails.has(user.email)).map((user) => user.id);
   if (demoUserIds.length !== 3) throw new Error("Run pnpm demo:seed before the interview E2E test.");
+  enterpriseAUserId = data.users.find((user) => user.email === "enterprise-a@qianzo.local")!.id;
   await clearDemoBusinessData(adminSql, demoUserIds);
   const { data: builderUser, error: createError } = await authAdmin.auth.admin.createUser({
     email: builderOnlyEmail,
@@ -73,7 +76,7 @@ test("a draft becomes a published recruitment project end to end", async ({
   const password = tools.DEMO_USER_PASSWORD;
 
   await loginDemoUser(page, "enterprise-a@qianzo.local", password);
-  await page.getByRole("link", { name: "创建项目" }).click();
+  await page.getByRole("link", { name: "开始需求" }).click();
   await page.getByLabel("项目标题").fill("E2E 访谈项目");
   await page.getByLabel("原始需求").fill("ZZSECRET-原始需求：需要把访谈整理成可招募的确认范围。");
   await page.getByRole("button", { name: "创建草稿" }).click();
@@ -328,13 +331,27 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(builderPage).toHaveURL(/\/projects$/);
 
   // The published project shows up in the recruitment view, masked.
+  await insertVisualOpenProjects(adminSql, enterpriseAUserId);
   await builderPage.setViewportSize({ width: 1440, height: 900 });
   await builderPage.goto("/projects");
+  await expect(builderPage.getByRole("heading", { name: "项目大厅" })).toBeVisible();
+  await expect(builderPage.getByText("07 MATCHES")).toBeVisible();
   await expectNoHorizontalOverflow(builderPage);
-  await builderPage.screenshot({ path: test.info().outputPath("recruitment-list-desktop.png") });
+  const desktopColumns = await builderPage.getByTestId("recruitment-results").evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length);
+  expect(desktopColumns).toBe(3);
+  await expect(builderPage.getByTestId("recruitment-results").getByRole("link")).toHaveCount(7);
+  await builderPage.emulateMedia({ reducedMotion: "reduce" });
+  await builderPage.evaluate(() => document.fonts.ready);
+  await builderPage.screenshot({ path: test.info().outputPath("recruitment-list-desktop.png"), fullPage: true, animations: "disabled" });
+  await builderPage.setViewportSize({ width: 768, height: 1024 });
+  const tabletColumns = await builderPage.getByTestId("recruitment-results").evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length);
+  expect(tabletColumns).toBe(2);
+  await builderPage.screenshot({ path: test.info().outputPath("recruitment-list-tablet.png"), fullPage: true, animations: "disabled" });
   await builderPage.setViewportSize({ width: 390, height: 844 });
   await expectNoHorizontalOverflow(builderPage);
-  await builderPage.screenshot({ path: test.info().outputPath("recruitment-list-mobile.png") });
+  const mobileColumns = await builderPage.getByTestId("recruitment-results").evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(" ").length);
+  expect(mobileColumns).toBe(1);
+  await builderPage.screenshot({ path: test.info().outputPath("recruitment-list-mobile.png"), fullPage: true, animations: "disabled" });
   await expect(builderPage.getByRole("link", { name: /E2E 招募项目（脱敏）/ })).toBeVisible();
   const recruitmentSearch = builderPage.getByLabel("搜索招募项目");
   await recruitmentSearch.fill("需求与交付协作");

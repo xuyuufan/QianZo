@@ -69,9 +69,10 @@ test("a seeded Builder keeps a real session across refresh and can sign out", as
   await page.getByRole("button", { name: "登录" }).click();
 
   await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/projects$/);
-  await expect(page.getByRole("heading", { name: "招募中的项目" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "项目大厅" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "开发者导航" }).getByRole("link", { name: "项目大厅" })).toHaveAttribute("aria-current", "page");
   await page.reload();
-  await expect(page.getByRole("heading", { name: "招募中的项目" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "项目大厅" })).toBeVisible();
 
   await page.getByRole("button", { name: "退出" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);

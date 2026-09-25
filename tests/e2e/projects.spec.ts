@@ -10,6 +10,7 @@ import {
   requireLoopbackDatabaseUrl,
 } from "../helpers/local-env";
 import { clearDemoBusinessData } from "../helpers/demo-data";
+import { insertVisualDrafts } from "../helpers/ui-visual-fixtures";
 
 const { tools, app } = loadLocalEnv(resolve(process.cwd()));
 if (!tools.DEMO_USER_PASSWORD || !tools.SUPABASE_SERVICE_ROLE_KEY) {
@@ -26,6 +27,7 @@ const adminSql = postgres(requireLoopbackDatabaseUrl(tools.SUPABASE_DB_ADMIN_URL
   prepare: false,
 });
 let demoUserIds: string[] = [];
+let enterpriseAUserId: string;
 const builderOnlyEmail = `project-builder-${Date.now()}@qianzo.test`;
 let builderOnlyUserId: string;
 
@@ -47,6 +49,7 @@ test.beforeAll(async () => {
   ]);
   demoUserIds = data.users.filter((user) => user.email && emails.has(user.email)).map((user) => user.id);
   if (demoUserIds.length !== 3) throw new Error("Run pnpm demo:seed before the project E2E tests.");
+  enterpriseAUserId = data.users.find((user) => user.email === "enterprise-a@qianzo.local")!.id;
   await clearDemoBusinessData(adminSql, demoUserIds);
   const { data: builderUser, error: createError } = await authAdmin.auth.admin.createUser({
     email: builderOnlyEmail,
@@ -76,7 +79,10 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   test.setTimeout(60_000);
   await login(page, "enterprise-a@qianzo.local");
   await expect(page).toHaveURL(/\/enterprise\/projects$/);
-  await page.getByRole("link", { name: /创建项目/ }).first().click();
+  await expect(page.getByRole("heading", { name: "我的项目" })).toBeVisible();
+  await expect(page.getByText("还没有项目，从一个想法开始。" )).toBeVisible();
+  await expect(page.getByRole("link", { name: "开始需求" })).toHaveAttribute("href", "/enterprise/projects/new");
+  await page.getByRole("link", { name: "开始需求" }).click();
   await page.getByLabel("项目标题").fill("E2E 原始项目");
   await page.getByLabel("原始需求").fill("需要一个可持久化且隔离的草稿。");
   await page.getByRole("button", { name: "创建草稿" }).click();
@@ -87,6 +93,33 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   await expect(page.getByRole("heading", { name: "E2E 原始项目" })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("项目标题")).toHaveValue("E2E 原始项目");
+
+  await insertVisualDrafts(adminSql, enterpriseAUserId);
+  await page.goto("/enterprise/projects");
+  const projectRow = page.getByRole("link", { name: /E2E 原始项目/ });
+  await expect(projectRow).toContainText("草稿");
+  await expect(projectRow).toContainText("Spec 待整理");
+  await expect(page.locator("main ul a")).toHaveCount(7);
+  await expect(page.getByRole("navigation", { name: "项目状态筛选" })).toContainText(/全部\s*7/);
+  await expect(page.getByRole("navigation", { name: "项目状态筛选" })).toContainText(/草稿\s*7/);
+  await expect(page.getByRole("navigation", { name: "项目状态筛选" })).toContainText(/等待开发者\s*0/);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => document.fonts.ready);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: test.info().outputPath("my-projects-desktop.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  await page.screenshot({ path: test.info().outputPath("my-projects-tablet.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  await page.screenshot({ path: test.info().outputPath("my-projects-mobile.png"), fullPage: true, animations: "disabled" });
+  await page.goto("/enterprise/projects?status=open");
+  await expect(page.getByText("暂无等待开发者项目。" )).toBeVisible();
+  await expect(page.getByRole("link", { name: /E2E 原始项目/ })).toHaveCount(0);
+  await page.goto("/enterprise/projects?status=draft");
+  await expect(page.getByRole("link", { name: /E2E 原始项目/ })).toBeVisible();
+  await expect(page.locator("main ul a")).toHaveCount(7);
+  await page.goto(projectPath);
 
   const staleEditor = await page.context().newPage();
   await staleEditor.goto(projectPath);
@@ -121,7 +154,7 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   await login(builderPage, builderOnlyEmail);
   await builderPage.goto("/enterprise/projects/new");
   await expect(builderPage).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/projects$/);
-  await expect(builderPage.getByRole("heading", { name: "招募中的项目" })).toBeVisible();
+  await expect(builderPage.getByRole("heading", { name: "项目大厅" })).toBeVisible();
   await builderContext.close();
 
   await page.getByRole("button", { name: "退出" }).click();
