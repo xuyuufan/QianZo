@@ -14,10 +14,10 @@ test("public home presents both identity intentions using the Lovable layout", a
     "src",
     "/assets/qianzo-mechanical-light-poster.webp",
   );
-  await expect(page.locator(".qianzo-home video source")).toHaveAttribute(
-    "src",
-    "/assets/qianzo-mechanical-light.mp4",
-  );
+  // This viewport also asks for reduced motion, where `styles.css` hides the
+  // film layer outright, so the 7.8MB clip must not be attached or requested.
+  await expect(page.locator(".qianzo-film")).toBeHidden();
+  await expect(page.locator(".qianzo-home video source")).toHaveCount(0);
 
   const requester = await page.locator('.role-entry[data-role="requester"]').boundingBox();
   const builder = await page.locator('.role-entry[data-role="builder"]').boundingBox();
@@ -52,6 +52,12 @@ test("home retains the poster when the local video cannot load", async ({ page }
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.route("**/assets/qianzo-mechanical-light.mp4", (route) => route.abort());
   await page.goto("/");
+  // A desktop viewport without a reduced-motion preference is the one case that
+  // mounts the clip, so the request the route aborts above is really made.
+  await expect(page.locator(".qianzo-home video source")).toHaveAttribute(
+    "src",
+    "/assets/qianzo-mechanical-light.mp4",
+  );
   const video = page.locator(".qianzo-film");
   await expect(video).toBeHidden();
   const posterLoaded = await page.locator(".qianzo-home > img").evaluate((image: HTMLImageElement) => image.naturalWidth > 0);

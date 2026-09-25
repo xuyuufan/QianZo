@@ -18,15 +18,18 @@ export function HomePage() {
   const activeRole = hoverRole ?? selectedRole;
 
   // The poster carries the first paint, so the 7.8MB clip is only requested
-  // once the desktop breakpoint matches. Below `md` the element is css-hidden
-  // but would still autoplay and download the whole video for a frame the user
-  // never sees. The media query is known only on the client, so the first
-  // render (which server and client agree on) has no source yet.
+  // once it can actually be shown. Below `md` the film layer is css-hidden, and
+  // `prefers-reduced-motion: reduce` hides it outright, so neither case should
+  // autoplay or download the video for a frame the visitor never sees. A
+  // compound query reports changes in either part, and the first render (which
+  // server and client agree on) has no source yet.
   const [showVideo, setShowVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const query = window.matchMedia("(min-width: 768px)");
+    const query = window.matchMedia(
+      "(min-width: 768px) and (prefers-reduced-motion: no-preference)",
+    );
     const update = () => setShowVideo(query.matches);
     update();
     query.addEventListener("change", update);
