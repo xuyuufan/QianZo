@@ -169,9 +169,23 @@ S1-06 的验收与文档提交见 `eb38dc6`。
 ### 本轮实际验证（2026-09-26，Windows 本机）
 
 - `corepack pnpm typecheck`：通过。`corepack pnpm lint`：通过（无警告）。
-- `corepack pnpm test`：10 个文件、91 个单元用例通过。
+- `corepack pnpm test`：10 个文件、**93** 个单元用例通过（本轮复审为 `editor-sync` 归一化新增 2 例）。
 - `corepack pnpm test:integration`：9 个文件、115 个真实本地 Supabase/PostgreSQL 用例通过。
 - `corepack pnpm build`：通过，11 条 App Router 路由（`/`、`/_not-found`、`/enterprise/projects`、`/enterprise/projects/[projectId]`、`/enterprise/projects/[projectId]/publish`、`/enterprise/projects/[projectId]/spec`、`/enterprise/projects/new`、`/onboarding`、`/projects`、`/projects/[projectId]`、`/sign-in`）。
 - `corepack pnpm start` + `corepack pnpm test:e2e`：**11 个真实浏览器用例全部通过**（约 1.8 分钟），`/sign-in` 返回 200。E2E 运行在**生产构建与生产服务**上，覆盖完整 S0→S1 主链路（创建草稿 → 两轮访谈 → 生成候选 → 采用 → 手工另存 → 锁定 → 定金 → 文字脱敏 → 发布 → 招募浏览）、登录意图与 onboarding、越权拒绝、响应隐私与桌面/平板/手机布局。用例分布：`aipm-interview` 1、`home` 5、`identity` 4、`projects` 1。截图仍只落在 Git 忽略的 `test-results/`。
 - **独立复核（另一执行者，非本轮实现者）**：独立复跑 `typecheck`、`lint`、`test`（10/91）、`test:integration`（9/115），结论一致；对 E2E 断言逐条比对**未发现变松或换语义**（全文无 `waitForTimeout` / `force: true` / `skip` / `only`），隐私类断言（响应体不含原始需求、访谈正文、企业邮箱与 `ZZSECRET` 标记）**原样保留**；`tests/helpers/ui-visual-fixtures.ts` 的合成夹具仅用于版式截屏与列表计数，主链路仍由 UI 驱动真实 Server Action，夹具行由既有 `clearDemoBusinessData`（含 `spec_versions`）清理，无残留污染。
 - **已知测试缺口（本轮未补，非回归）**：`?version=` 深链非法输入的页面级断言、`publishProjectAction` 的 action 级错误映射、招募详情渲染 HTML 对企业 `displayName` 的直接负向断言。三者当前分别由仓储归属校验、代码路径审查与白名单/DTO 精确断言间接保证。
+
+### PR #3 复审修复（2026-09-26）
+
+PR #3 的自动评审给出 7 条 P2，全部核实成立并修复（均为既有 E2E 覆盖不到的交互路径）：
+
+- **跨角色入口不可达**：`project-header.tsx` 的「重新选择身份」一直指向 `/`，而已登录用户在 `/` 会按角色直接重定向且 ENTERPRISE 优先，双角色用户因此**没有任何 UI 路径进入开发者项目大厅**。现仅在同时持有两种角色时渲染切换链接，并直接指向另一角色的首页；单角色时不渲染。
+- **文档内锚点 ID 重复**：`SpecDocumentView` 的 `#spec-section-N` 在 current / candidate / history 三个同时挂载（仅 `hidden`）的面板里重复，目录链接会命中更早的隐藏面板。新增 `idPrefix`，工作区三处分别使用 `current-` / `candidate-` / `history-`。
+- **公开页泄露结构 ID**：招募详情复用 `SpecDocumentView`，把 `role.id`/`feature.id`/`milestone.id`/`criterion.id` 等渲染给所有已登录用户；而脱敏契约要求 ID 保持不变，发布者无法脱敏。新增 `showIds`（默认显示），公开招募详情传 `false`，并用序号占位保持网格不塌陷。
+- **阶段文案与支付状态不符**：项目总览的 `stageLabel` 只看 `status`/`locked`，Mock 定金成功后回到总览仍显示「等待模拟定金」。现复用既有 `getProjectPayment` 区分「定金已完成，等待发布」。
+- **陈旧服务端错误永久禁用发布**：空白脱敏标题被服务端 `trim` 后拒绝会留下非空 `state.issues`，用户改正标题后按钮仍永久禁用。现用「提交指纹」只在输入未变时采信服务端错误；`spec-editor-form` 的同类问题一并修掉。
+- **浏览器前进/后退无确认丢稿**：未保存守卫原只覆盖 `beforeunload` 与点击锚点，App Router 的客户端历史切换两者都不触发。现未保存时在历史栈压入守卫项并监听 `popstate`：确认离开才真正退栈，取消则重新压回；保存或放弃后在清理阶段弹出守卫项，不干扰正常后退。
+- **保存归一化成功后无法回到干净态**：`syncEditorWithServer` 原以**原始字符串**比较，而服务端存储前会 `trim`，于是「仅空白差异」的保存会永久停留在未保存态，进而**永久隐藏锁定入口**。现以同一套 `specDocumentSchema` 归一化后比较，并保留「脏编辑器保留用户输入」的原有语义；`tests/unit/editor-sync.test.ts` 补 2 例（仅空白差异判干净、真实差异仍判脏）。
+
+复审后重跑：`typecheck`/`lint` 通过，单元 **10 文件 93 例**、集成 **9 文件 115 例**、构建 **11 条路由**、E2E **11 例全绿**。
