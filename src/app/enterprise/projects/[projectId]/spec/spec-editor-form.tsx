@@ -34,6 +34,9 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
     document: JSON.parse(initialContent) as SpecDocumentV1,
     syncedContent: initialContent,
   }));
+  // Fingerprint of the last submitted content, so the server's field messages
+  // are only shown while they still describe the draft on screen.
+  const [submittedContent, setSubmittedContent] = useState<string | null>(null);
   const serverSync = syncEditorWithServer({
     initialContent,
     content: JSON.stringify(editorDraft.document, null, 2),
@@ -73,6 +76,36 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
     };
   }, [unsaved]);
 
+  // The click guard above cannot see the browser's Back/Forward buttons, which
+  // move through the App Router's own client history. While there are unsaved
+  // edits, park a guard entry on top of the current one so the first Back or
+  // Forward can be intercepted: accepting leaves, dismissing re-parks the guard
+  // so the user stays on the page with their edits intact.
+  useEffect(() => {
+    if (!unsaved) return;
+    const guardState = { ...window.history.state, qianzoSpecEditorGuard: true };
+    let leaving = false;
+    window.history.pushState(guardState, "", window.location.href);
+    const guardHistory = () => {
+      if (leaving) return;
+      if (window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) {
+        leaving = true;
+        window.history.go(-1);
+      } else {
+        window.history.pushState(guardState, "", window.location.href);
+      }
+    };
+    window.addEventListener("popstate", guardHistory);
+    return () => {
+      window.removeEventListener("popstate", guardHistory);
+      // Step back off the guard entry once the edits are saved or abandoned so
+      // Back keeps behaving normally and the entries do not accumulate.
+      if (window.history.state?.qianzoSpecEditorGuard) {
+        window.history.back();
+      }
+    };
+  }, [unsaved]);
+
   const validation = useMemo(() => {
     const parsed = specDocumentSchema.safeParse(document);
     return {
@@ -84,7 +117,8 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
       })),
     };
   }, [document]);
-  const issues = validation.issues.length ? validation.issues : state.issues;
+  const serverFeedbackApplies = submittedContent === content;
+  const issues = validation.issues.length ? validation.issues : serverFeedbackApplies ? state.issues : [];
   const set = (update: (current: SpecDocumentV1) => SpecDocumentV1) => setEditorDraft((current) => {
     // Reconcile against the latest server props inside the user event update.
     // A clean editor follows a new candidate; a dirty editor remains local.
@@ -134,7 +168,7 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
   }
 
   return (
-    <form action={formAction} className="project-form spec-structured-form" data-testid="structured-spec-editor">
+    <form action={formAction} onSubmit={() => { setSubmittedContent(content); }} className="project-form spec-structured-form" data-testid="structured-spec-editor">
       <input name="expectedVersion" type="hidden" value={version} />
       <input name="document" type="hidden" value={content} />
       <SpecFieldIssueProvider value={validation.paths}>

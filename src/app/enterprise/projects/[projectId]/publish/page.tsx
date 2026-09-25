@@ -9,7 +9,7 @@ import { projectIdSchema } from "@/modules/projects/validation";
 import { getProjectSpecs } from "@/modules/specs/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
-import { ProjectHeader } from "../../project-header";
+import { ProjectHeader, projectHeaderRoles } from "../../project-header";
 import { DepositForm } from "./deposit-form";
 import { PublishForm } from "./publish-form";
 
@@ -52,7 +52,7 @@ export default async function ProjectPublishPage({ params }: PublishPageProps) {
 
   return (
     <main className="qz-paper min-h-[100svh]">
-      <ProjectHeader fullBleed />
+      <ProjectHeader fullBleed availableRoles={projectHeaderRoles(actor.roles)} />
       <section className="qz-rise mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         <Link
           className="mb-8 inline-flex items-center gap-2 font-zh text-xs text-muted-foreground transition-colors hover:text-foreground"

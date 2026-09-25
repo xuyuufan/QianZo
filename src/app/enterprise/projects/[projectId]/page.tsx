@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SpecDocumentView } from "@/components/spec-document-view";
 import { getActorById } from "@/modules/identity/service";
+import { getProjectPayment } from "@/modules/payments/service";
 import { DEMO_CURRENCY, describeBudget, formatMinorUnits } from "@/modules/projects/money";
 import { projectIdSchema } from "@/modules/projects/validation";
 import { specDeliveryDays, type SpecDocumentV1 } from "@/modules/specs/document";
@@ -13,7 +14,7 @@ import { getProjectSpecs } from "@/modules/specs/service";
 import { specVersionIdSchema } from "@/modules/specs/validation";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
-import { ProjectHeader } from "../project-header";
+import { ProjectHeader, projectHeaderRoles } from "../project-header";
 import { BudgetForm } from "./budget-form";
 import { EditProjectForm } from "./edit-project-form";
 
@@ -63,13 +64,20 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
 
   const { project } = history;
   const locked = project.lockedSpecVersionId !== null;
+  // The stage label must reflect the real deposit, not just the lock: after a
+  // successful Mock deposit the project is still a draft until it is published,
+  // so keying only off `locked` would keep saying "awaiting deposit".
+  const paymentState = await getProjectPayment(userId, project.id);
+  const depositSucceeded = paymentState?.payment?.status === "SUCCEEDED";
   const budget = describeBudget(project.budgetMinMinor, project.budgetMaxMinor, project.currency);
   const currency = project.currency ?? DEMO_CURRENCY;
   const statusLabel = project.status === "OPEN" ? "招募中" : locked ? "范围已锁定" : "草稿";
   const stageLabel = project.status === "OPEN"
     ? "招募已开放"
     : locked
-      ? "范围已确认，等待模拟定金"
+      ? depositSucceeded
+        ? "范围已确认，模拟定金已完成，等待发布"
+        : "范围已确认，等待模拟定金"
       : history.current
         ? "Spec 已保存，待确认范围"
         : "需求待整理";
@@ -86,7 +94,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
 
   return (
     <div className="qz-paper min-h-[100svh]">
-      <ProjectHeader fullBleed />
+      <ProjectHeader fullBleed availableRoles={projectHeaderRoles(actor.roles)} />
       <main className="qz-rise mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         <Link href="/enterprise/projects" className="mb-7 inline-flex items-center gap-2 font-zh text-xs text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="size-3.5" strokeWidth={1.5} aria-hidden="true" />返回我的项目

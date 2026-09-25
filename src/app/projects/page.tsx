@@ -4,7 +4,7 @@ import { getActorById } from "@/modules/identity/service";
 import { listOpenRecruitments } from "@/modules/recruitment/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
-import { ProjectHeader } from "../enterprise/projects/project-header";
+import { ProjectHeader, projectHeaderRoles } from "../enterprise/projects/project-header";
 import { RecruitmentList } from "./recruitment-list";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export default async function RecruitmentListPage() {
 
   return (
     <div className="qz-paper min-h-[100svh]">
-      <ProjectHeader label="招募浏览" homeHref="/projects" fullBleed />
+      <ProjectHeader label="招募浏览" homeHref="/projects" fullBleed availableRoles={projectHeaderRoles(actor.roles)} />
       <main className="qz-rise mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
         <section aria-labelledby="recruitments-title">
           <div className="flex flex-wrap items-end justify-between gap-4">

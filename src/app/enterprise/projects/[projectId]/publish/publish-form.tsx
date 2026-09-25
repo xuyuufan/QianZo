@@ -60,6 +60,13 @@ export function PublishForm({
   const [activeView, setActiveView] = useState<"edit" | "preview">("edit");
   const content = useMemo(() => JSON.stringify(document), [document]);
 
+  // The server's field messages describe the exact input that was submitted.
+  // Fingerprinting that input lets a corrected form recover on its own instead
+  // of staying permanently blocked behind a stale error (e.g. a whitespace-only
+  // title the server trimmed and rejected, then the user fixed).
+  const [submittedFingerprint, setSubmittedFingerprint] = useState<string | null>(null);
+  const fingerprint = content + "\u0000" + title;
+
   const validation = useMemo(() => {
     const parsed = specDocumentSchema.safeParse(document);
     if (!parsed.success) {
@@ -77,7 +84,8 @@ export function PublishForm({
     };
   }, [document, lockedDocument]);
 
-  const issues = validation.issues.length > 0 ? validation.issues : state.issues;
+  const serverFeedbackApplies = submittedFingerprint === fingerprint;
+  const issues = validation.issues.length > 0 ? validation.issues : serverFeedbackApplies ? state.issues : [];
   const blocked = issues.length > 0 || !confirmed || activeView !== "preview";
 
   function updateDocument(update: (current: SpecDocumentV1) => SpecDocumentV1) {
@@ -104,6 +112,9 @@ export function PublishForm({
   return (
     <form
       action={formAction}
+      onSubmit={() => {
+        setSubmittedFingerprint(fingerprint);
+      }}
       className="structured-mask-form"
       data-testid="structured-masked-spec-editor"
     >
@@ -309,7 +320,7 @@ export function PublishForm({
           <small>改标题或改预览后需要重新勾选确认。</small>
         </span>
       </label>
-      {state.message ? (
+      {state.message && serverFeedbackApplies ? (
         <p className="form-message error" role="alert" data-error-code={state.errorCode ?? undefined}>
           {state.message}
         </p>

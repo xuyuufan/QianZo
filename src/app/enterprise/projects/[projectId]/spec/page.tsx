@@ -10,7 +10,7 @@ import { getProjectSpecs } from "@/modules/specs/service";
 import { specVersionIdSchema } from "@/modules/specs/validation";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
-import { ProjectHeader } from "../../project-header";
+import { ProjectHeader, projectHeaderRoles } from "../../project-header";
 import { InterviewForm } from "./interview-form";
 import { SpecReviewWorkspace } from "./spec-review-workspace";
 
@@ -71,7 +71,7 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
 
   return (
     <main className="qz-paper min-h-[100svh]">
-      <ProjectHeader fullBleed />
+      <ProjectHeader fullBleed availableRoles={projectHeaderRoles(actor.roles)} />
       <section className="qz-rise mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         <Link
           className="mb-8 inline-flex items-center gap-2 font-zh text-xs text-muted-foreground transition-colors hover:text-foreground"

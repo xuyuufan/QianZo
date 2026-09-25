@@ -166,7 +166,7 @@ export function SpecReviewWorkspace({
           data-testid="current-spec-view"
         >
           <VersionMeta version={current} current />
-          <SpecDocumentView document={current.document} />
+          <SpecDocumentView document={current.document} idPrefix="current-" />
         </section>
       ) : null}
 
@@ -208,7 +208,7 @@ export function SpecReviewWorkspace({
               </p>
             )}
           </div>
-          <SpecDocumentView document={candidate.document} />
+          <SpecDocumentView document={candidate.document} idPrefix="candidate-" />
         </section>
       ) : null}
 
@@ -247,7 +247,7 @@ export function SpecReviewWorkspace({
             <div data-testid="spec-version-detail">
               <VersionMeta version={selectedVersion} current={selectedVersion.id === current?.id} />
               {selectedVersion.document ? (
-                <SpecDocumentView document={selectedVersion.document} />
+                <SpecDocumentView document={selectedVersion.document} idPrefix="history-" />
               ) : (
                 <p className="border-y border-border py-4 font-zh text-sm text-muted-foreground">
                   这个版本无法通过当前 Spec 校验，只读保留，不能修改。

@@ -1,22 +1,43 @@
 import Link from "next/link";
 
 import { signOutAction } from "@/app/actions/auth";
+import type { UserRole } from "@/platform/db/schema";
 
 import { ProductNav } from "./product-nav";
+
+export type HeaderRole = "requester" | "builder";
 
 type ProjectHeaderProps = {
   label?: string;
   homeHref?: string;
-  role?: "requester" | "builder";
+  role?: HeaderRole;
   fullBleed?: boolean;
+  /**
+   * Every role the signed-in actor holds. The "switch role" link is only shown
+   * when there is more than one role to switch between, so it never points at a
+   * route the actor cannot reach (the home "/" always resolves to the
+   * ENTERPRISE side first, which made the link a no-op for requesters).
+   */
+  availableRoles?: HeaderRole[];
 };
+
+/** Maps the platform roles an actor holds to the header's role vocabulary. */
+export function projectHeaderRoles(roles: readonly UserRole[]): HeaderRole[] {
+  const mapped: HeaderRole[] = [];
+  if (roles.includes("ENTERPRISE")) mapped.push("requester");
+  if (roles.includes("BUILDER")) mapped.push("builder");
+  return mapped;
+}
 
 export function ProjectHeader({
   label = "企业项目",
   homeHref = "/enterprise/projects",
   role = homeHref === "/projects" ? "builder" : "requester",
   fullBleed = false,
+  availableRoles = [],
 }: ProjectHeaderProps = {}) {
+  const canSwitchRole = availableRoles.length > 1;
+  const switchHref = role === "requester" ? "/projects" : "/enterprise/projects";
   return (
     <header className={`${fullBleed ? "" : "-mx-[clamp(1rem,4vw,3.5rem)]"} sticky top-0 z-20 border-b border-border bg-card/90 backdrop-blur-sm`} aria-label={`${label}导航`}>
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
@@ -32,7 +53,9 @@ export function ProjectHeader({
             <span className={`size-1.5 rounded-full ${role === "requester" ? "bg-requester" : "bg-builder"}`} />
             {role === "requester" ? "需求方" : "开发者"}
           </span>
-          <Link href="/" className="hover:text-foreground">重新选择身份</Link>
+          {canSwitchRole ? (
+            <Link href={switchHref} className="hover:text-foreground">重新选择身份</Link>
+          ) : null}
           <form action={signOutAction}>
             <button
               type="submit"

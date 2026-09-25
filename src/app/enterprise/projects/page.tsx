@@ -5,7 +5,7 @@ import { getActorById } from "@/modules/identity/service";
 import { listOwnProjects } from "@/modules/projects/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
-import { ProjectHeader } from "./project-header";
+import { ProjectHeader, projectHeaderRoles } from "./project-header";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +54,7 @@ export default async function EnterpriseProjectsPage({
 
   return (
     <div className="qz-paper min-h-[100svh]">
-      <ProjectHeader fullBleed />
+      <ProjectHeader fullBleed availableRoles={projectHeaderRoles(actor.roles)} />
       <main className="qz-rise mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
         <section aria-labelledby="projects-title">
           <div className="border-b border-border pb-4">

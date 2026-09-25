@@ -7,7 +7,7 @@ import { projectIdSchema } from "@/modules/projects/validation";
 import { getOpenRecruitment } from "@/modules/recruitment/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
-import { ProjectHeader } from "../../enterprise/projects/project-header";
+import { ProjectHeader, projectHeaderRoles } from "../../enterprise/projects/project-header";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export default async function RecruitmentDetailPage({ params }: RecruitmentPageP
 
   return (
     <main className="qz-paper min-h-[100svh]">
-      <ProjectHeader label="招募浏览" homeHref="/projects" fullBleed />
+      <ProjectHeader label="招募浏览" homeHref="/projects" fullBleed availableRoles={projectHeaderRoles(actor.roles)} />
       <section className="qz-rise mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         <Link className="mb-8 inline-flex items-center gap-2 font-zh text-xs text-muted-foreground transition-colors hover:text-foreground" href="/projects">
           ← 返回招募列表
@@ -71,7 +71,7 @@ export default async function RecruitmentDetailPage({ params }: RecruitmentPageP
             <p className="font-brand text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Public project scope</p>
             <h2 className="mt-2 font-zh text-xl font-normal">已确认的范围</h2>
           </div>
-          <SpecDocumentView document={recruitment.document} />
+          <SpecDocumentView document={recruitment.document} showIds={false} />
         </section>
 
         <p className="mt-10 border-t border-border pt-5 font-zh text-xs leading-5 text-muted-foreground">
