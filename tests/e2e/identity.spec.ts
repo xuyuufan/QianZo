@@ -73,7 +73,7 @@ test("a seeded Builder keeps a real session across refresh and can sign out", as
   await page.reload();
   await expect(page.getByRole("heading", { name: "招募中的项目" })).toBeVisible();
 
-  await page.getByRole("button", { name: "退出登录" }).click();
+  await page.getByRole("button", { name: "退出" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
   await page.goto("/enterprise/projects");
   await expect(page).toHaveURL(/\/sign-in$/);

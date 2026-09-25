@@ -124,7 +124,7 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   await expect(builderPage.getByRole("heading", { name: "招募中的项目" })).toBeVisible();
   await builderContext.close();
 
-  await page.getByRole("button", { name: "退出登录" }).click();
+  await page.getByRole("button", { name: "退出" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
   await login(page, "enterprise-a@qianzo.local");
   await page.goto(projectPath);

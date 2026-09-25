@@ -1,111 +1,232 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { ArrowDownRight, ArrowRight, Building2, Code2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, Building2, Code2 } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 type Role = "requester" | "builder";
 
 export function HomePage() {
-  const [activeRole, setActiveRole] = useState<Role | null>(null);
+  const router = useRouter();
+  const [hoverRole, setHoverRole] = useState<Role | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [transitioning, setTransitioning] = useState<Role | null>(null);
+  const activeRole = hoverRole ?? selectedRole;
+
+  useEffect(() => {
+    const video = document.querySelector<HTMLVideoElement>(".qianzo-film");
+    const source = video?.querySelector("source");
+    if (!video) return;
+    const hideFailedVideo = () => {
+      video.style.display = "none";
+    };
+    video.addEventListener("error", hideFailedVideo);
+    source?.addEventListener("error", hideFailedVideo);
+    if (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) hideFailedVideo();
+    return () => {
+      video.removeEventListener("error", hideFailedVideo);
+      source?.removeEventListener("error", hideFailedVideo);
+    };
+  }, []);
+
+  const chooseRole = (role: Role) => {
+    if (transitioning) return;
+    setSelectedRole(role);
+    setTransitioning(role);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.setTimeout(() => {
+      router.push(`/sign-in?intent=${role}`);
+    }, reduceMotion ? 320 : 1300);
+  };
 
   return (
-    <main className="qianzo-home" data-active-role={activeRole ?? "none"}>
-      <div className="home-mechanical" aria-hidden="true">
-        <div className="home-orbit home-orbit-one" />
-        <div className="home-orbit home-orbit-two" />
-        <div className="home-orbit home-orbit-three" />
-        <div className="home-axis"><i /><i /><i /></div>
-      </div>
-      <div className="home-grain" aria-hidden="true" />
-      <header className="home-header">
-        <Link href="/" className="home-brand" aria-label="千轴首页">
-          <span>QIANZO</span><span>千轴</span>
+    <main
+      className="qianzo-home group/home relative isolate flex min-h-[100svh] overflow-hidden bg-background text-foreground"
+      data-active-role={activeRole ?? "none"}
+      data-scheme="light"
+      data-transition={transitioning ?? undefined}
+    >
+      <div className="absolute inset-0 -z-30 bg-background" />
+      <Image
+        src="/assets/qianzo-mechanical-light-poster.webp"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 -z-20 size-full object-cover grayscale"
+        width={1920}
+        height={1080}
+        sizes="100vw"
+        priority
+        unoptimized
+      />
+      <video
+        className="qianzo-film absolute inset-0 -z-20 hidden size-full object-cover grayscale md:block"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        poster="/assets/qianzo-mechanical-light-poster.webp"
+        onLoadedMetadata={(event) => {
+          event.currentTarget.playbackRate = 1.2;
+        }}
+        aria-hidden="true"
+      >
+        <source
+          src="/assets/qianzo-mechanical-light.mp4"
+          type="video/mp4"
+        />
+      </video>
+      <div className="qianzo-shade absolute inset-0 -z-10" aria-hidden="true" />
+      <div className="qianzo-grain pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
+
+      <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 pt-5 sm:px-8 sm:pt-7 lg:px-12 lg:pt-9">
+        <Link href="/" aria-label="千轴首页" className="flex items-baseline gap-3 text-foreground">
+          <span className="font-brand text-sm font-medium uppercase tracking-[0.22em]">QIANZO</span>
+          <span className="font-zh text-sm font-light text-foreground/65">千轴</span>
         </Link>
-        <span className="home-caption"><i /> SPEC-DRIVEN COLLABORATION</span>
+        <span className="hidden items-center gap-2 font-brand text-[10px] uppercase tracking-[0.2em] text-foreground/40 sm:flex">
+          <span className="size-1 rounded-full bg-foreground/45" />
+          Spec-driven collaboration
+        </span>
       </header>
 
-      <section className="home-content">
-        <div className="home-intro">
-          <div className="home-rule" aria-hidden="true"><i /><b /><i /><b /><i /></div>
-          <p className="home-kicker">从想法，到清晰可交付的项目</p>
-          <h1>从想法到交付，<br />每一步都有据可依。</h1>
-          <p className="home-description">
-            千轴将需求梳理为清晰的 Spec，<br className="desktop-break" />
-            让需求方与开发者围绕同一套标准协作、开发与验收。
-          </p>
+      <section className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-5 pb-7 pt-24 sm:px-8 sm:pb-10 lg:px-12 lg:pb-12 lg:pt-28">
+        <div className="flex flex-1 items-center justify-center pb-10 pt-6 sm:pb-14">
+          <div className="qianzo-copy max-w-[850px] text-center">
+            <div className="mb-7 flex items-center justify-center gap-3 sm:mb-9" aria-hidden="true">
+              <span className="h-px w-10 bg-foreground/20" />
+              <span className="size-1 rounded-full bg-requester" />
+              <span className="h-px w-16 bg-foreground/20" />
+              <span className="size-1 rounded-full bg-builder" />
+              <span className="h-px w-10 bg-foreground/20" />
+            </div>
+            <h1 className="font-zh text-[clamp(2.25rem,5.3vw,5rem)] font-light leading-[1.18] tracking-normal text-foreground">
+              从想法到交付，
+              <br />
+              每一步都有据可依。
+            </h1>
+            <p className="mx-auto mt-6 max-w-[610px] font-zh text-sm font-light leading-7 tracking-normal text-foreground/62 sm:mt-8 sm:text-base sm:leading-8">
+              千轴将需求梳理为清晰的 Spec，
+              <span className="hidden sm:inline"><br /></span>
+              让需求方与开发者围绕同一套标准协作、开发与验收。
+            </p>
+          </div>
         </div>
 
-        <div className="home-roles">
-          <RoleCard
+        <div className="grid w-full grid-cols-1 border-y border-foreground/15 sm:grid-cols-2 sm:border-y-0">
+          <RoleEntry
             role="requester"
-            active={activeRole === "requester"}
-            onFocus={setActiveRole}
-            icon={<Building2 aria-hidden="true" />}
             title="我是需求方"
-            subtitle="发布项目 · 梳理需求 · 明确验收"
-            detail="把想法变成可评估、可协作的项目 Spec。"
+            description="发布项目、梳理需求"
+            activeRole={activeRole}
+            selected={selectedRole === "requester"}
+            disabled={transitioning !== null}
+            onFocus={setHoverRole}
+            onChoose={chooseRole}
           />
-          <RoleCard
+          <RoleEntry
             role="builder"
-            active={activeRole === "builder"}
-            onFocus={setActiveRole}
-            icon={<Code2 aria-hidden="true" />}
             title="我是开发者"
-            subtitle="浏览项目 · 理解范围 · 准备交付"
-            detail="在清楚的目标、里程碑与验收标准中协作。"
+            description="承接项目、完成交付"
+            activeRole={activeRole}
+            selected={selectedRole === "builder"}
+            disabled={transitioning !== null}
+            onFocus={setHoverRole}
+            onChoose={chooseRole}
           />
         </div>
-        <p className="home-footnote">让每一次协作，都从共同理解开始。</p>
+        <p className="mt-4 min-h-5 text-center font-zh text-xs font-light text-foreground/55" role="status" aria-live="polite">
+          {selectedRole
+            ? `已选择「${selectedRole === "requester" ? "我是需求方" : "我是开发者"}」· 正在进入登录`
+            : ""}
+        </p>
       </section>
-
-      <footer className="home-footer">
-        <span>清楚的需求 · 可验证的交付</span>
-        <ArrowDownRight aria-hidden="true" />
-        <span>QIANZO · 2026</span>
-      </footer>
+      {transitioning && (
+        <div className="qz-transition fixed inset-0 z-50" data-role={transitioning} aria-hidden="true">
+          <div className="qz-t-paper absolute inset-0" />
+          <div className="qz-t-grid absolute inset-0" />
+          <span className="qz-t-h absolute left-0 right-0 top-1/2 h-px" />
+          <span className="qz-t-v absolute bottom-0 left-1/2 top-0 w-px" />
+          <span className="qz-t-dot absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full" />
+        </div>
+      )}
     </main>
   );
 }
 
-function RoleCard({
+function RoleEntry({
   role,
-  active,
-  onFocus,
-  icon,
   title,
-  subtitle,
-  detail,
+  description,
+  activeRole,
+  selected,
+  disabled,
+  onFocus,
+  onChoose,
 }: {
+  selected: boolean;
+  disabled: boolean;
   role: Role;
-  active: boolean;
-  onFocus: (role: Role | null) => void;
-  icon: React.ReactNode;
   title: string;
-  subtitle: string;
-  detail: string;
+  description: string;
+  activeRole: Role | null;
+  onFocus: (role: Role | null) => void;
+  onChoose: (role: Role) => void;
 }) {
-  const intent = role === "requester" ? "requester" : "builder";
+  const isActive = activeRole === role;
+
   return (
-    <Link
-      href={`/sign-in?intent=${intent}`}
-      className="home-role"
-      data-role={role}
-      data-active={active}
+    <Button
+      type="button"
+      variant="ghost"
+      disabled={disabled}
       onMouseEnter={() => onFocus(role)}
       onMouseLeave={() => onFocus(null)}
       onFocus={() => onFocus(role)}
       onBlur={() => onFocus(null)}
+      onClick={() => onChoose(role)}
+      className="role-entry group/role relative h-auto min-h-28 w-full justify-start rounded-none border-0 bg-transparent px-0 py-5 text-left text-foreground shadow-none hover:bg-transparent hover:text-foreground focus-visible:ring-0 active:bg-foreground/[0.04] touch-manipulation sm:min-h-32 sm:border-y sm:border-foreground/15 sm:px-7 lg:min-h-36 lg:px-10"
+      data-role={role}
+      data-active={isActive ? "true" : "false"}
+      data-selected={selected ? "true" : "false"}
+      aria-pressed={selected}
+      aria-label={`${title}：${description}`}
     >
-      <span className="home-role-icon">{icon}</span>
-      <span className="home-role-copy">
-        <span className="home-role-overline">{role === "requester" ? "REQUEST A PROJECT" : "BUILD A PROJECT"}</span>
-        <strong>{title}</strong>
-        <span className="home-role-subtitle">{subtitle}</span>
-        <span className="home-role-detail">{detail}</span>
+      <span className="flex w-full items-center gap-5">
+        <span className="min-w-0 flex-1">
+          <span className="role-icon mb-3 block text-foreground/40 sm:mb-4" aria-hidden="true">
+            {role === "requester" ? (
+              <Building2 className="size-5 sm:size-[22px]" strokeWidth={1.25} />
+            ) : (
+              <Code2 className="size-5 sm:size-[22px]" strokeWidth={1.25} />
+            )}
+          </span>
+          <span className="role-kicker mb-2 block font-brand text-[10px] font-medium uppercase tracking-[0.2em] text-foreground/35">
+            {role === "requester" ? "REQUESTER" : "BUILDER"}
+          </span>
+          <span className="role-title block font-zh text-xl font-normal tracking-normal sm:text-2xl">
+            {title}
+          </span>
+          <span className="mt-2 block font-zh text-xs font-light tracking-normal text-foreground/48 sm:text-sm">
+            {description}
+          </span>
+          {selected && (
+            <span className="role-selected mt-3 inline-flex items-center gap-2 font-brand text-[10px] uppercase tracking-[0.2em]">
+              <span className="size-1.5 rounded-full bg-current" />
+              Selected · 已选择
+            </span>
+          )}
+        </span>
+        <span className="role-rail flex min-w-24 flex-1 items-center sm:min-w-28">
+          <span className="h-px flex-1 bg-current opacity-35" />
+          <span className="role-node size-2.5 rounded-full border border-current bg-background" />
+          <ArrowRight className="role-arrow ml-2 size-4" strokeWidth={1.25} />
+        </span>
       </span>
-      <ArrowRight className="home-role-arrow" aria-hidden="true" />
-      <span className="home-role-index">0{role === "requester" ? "1" : "2"}</span>
-    </Link>
+    </Button>
   );
 }
