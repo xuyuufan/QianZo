@@ -1,51 +1,59 @@
-# Qianzo Flow UI 接入设计
+# Qianzo Flow UI 视觉还原与后端接入
 
-**状态：已实施并通过本地整体验收（2026-09-25）；本地仓库是集成后应用的维护入口。**
+**状态：修复进行中。** 当前接入版没有忠实迁移 Lovable 页面；此前以 CSS 几何图形替代机械海报的决定撤销。UI 外观以本地下载源码为准，现有 Next.js/S0/S1 服务端流程继续作为业务事实来源。
 
-## 设计来源快照
+## 1. 设计源快照
 
-- Lovable 项目：[Qianzo Flow](https://lovable.dev/projects/7c709773-194a-416e-92a3-35135ccfccfc)
-- Lovable 项目 ID：`7c709773-194a-416e-92a3-35135ccfccfc`
-- 已核验源码提交：`a0c5a38a88db7768e84e13b51d263b0aebcd5acc`（2026-09-24）
-- 预览地址：[静态预览](https://id-preview--7c709773-194a-416e-92a3-35135ccfccfc.lovable.app)
-- 首页视频素材 HEAD 返回 HTTP 200；路径含 Lovable 专用 `/__l5e/assets-v1/`，不会作为本站必须资源。
+- 只读设计源：D:/xyfdr/下载/qianzo-axis
+- 下载目录没有 Git 元数据，无法核实此前文档记录的源码 commit。改用 SHA-256 清单冻结本次来源：115 个非环境文件，清单为 [qianzo-axis-source.sha256](ui-reference/qianzo-axis-source.sha256)，清单自身 SHA-256 为 cf509fc14c58458f8173896330eb2185d9d3c278750273cef982a8fd79669e67。源目录保持只读，.env 不复制进参考运行环境，也不进入哈希清单。
+- 原版参考环境副本：C:/Users/xyfdr/AppData/Local/Temp/qianzo-axis-reference-20260925。Auth 请求只返回隔离演示响应，地址指向未启动的 loopback:59999；没有连接任何业务数据库。参考页面以 Lovable 源码自带的展示数据为准。
+- 原版截图按相同字体等待并关闭动画后采集，首页固定显示海报帧；视口为 1440×900、768×1024、390×844。七页共 21 张截图位于 artifacts/ui-parity/original/，该目录由 .gitignore 排除。
 
-接入保留纸张底色、克制配色、细线分隔、双身份入口、留白和项目/Spec 的编辑工作台视觉。TanStack Start 路由、Lovable 认证、演示会话、localStorage 业务状态、AI Gateway、Supabase 配置和示例业务类型都不进入本地应用。
+### 素材清单
 
-## 已决定的集成约定
+| 素材 | 来源与处理 | SHA-256 |
+|---|---|---|
+| 浅色机械海报 | 下载源码 src/assets/qianzo-mechanical-light-poster.webp；复制到 public/assets/qianzo-mechanical-light-poster.webp，字节校验一致 | c7945852cd36f1bcf57bfaaa14828a7f88bfba02e9dd9f003e020d9095aa4230 |
+| 深色机械海报 | 保留在只读设计源中；原版首页固定使用浅色版本 | 0fb2d22fda2c5dc132918ab2f8f5d942879b04efbbe849438735d8399918c864 |
+| 浅色首页视频 | 下载目录只有 .asset.json 描述文件；按描述文件中的 Lovable 地址核验为 HTTP 200、video/mp4、7,819,004 字节，已存入 public/assets/qianzo-mechanical-light.mp4 | b2ee530763100e8677e7db87eb4f66a1e0e2b7b66d774238a6b948ffd9d3b888 |
+| 字体 | 原版 root 从 Google Fonts 加载 IBM Plex Sans 与 Noto Sans SC，源码没有附带字体文件。接入版将以本地文件提供这两种字体及 300/400/500 字重，减少外部加载差异 | 待任务 2 完成 |
 
-- 页面运行在现有 Next.js App Router；Server Components 继续调用现有带授权的服务层，写操作继续使用既有 Server Actions。
-- Tailwind CSS v4 通过 Next.js/PostCSS 接入；按实际 UI 使用安装 shadcn/Radix 派生组件与 Lucide 图标，不复制 Lovable 全部组件和依赖。
-- 首页访客公开可读。`intent=requester|builder` 只保留导航意图，最终目标由服务端核验的角色决定；没有意图时企业去自己的项目列表，其他有效用户去项目大厅。
-- 页面数据从服务端 DTO 与 `SpecDocumentV1` 派生。数据库 schema、migration、Action 字段/错误码和 S0/S1 权限边界保持既有实现。
-- Lovable 视频地址只用于设计来源核验；本站首页用渐变与 CSS 几何图形作为静态视觉，不请求视频、图片或 Lovable 私有素材路径。减少动态效果时动画降至近乎零时长，素材加载不再是登录前置条件。
-- 本地项目作为唯一维护入口；不建立 Lovable 与本地代码的双向同步。
+## 2. 原版页面与 Next.js 路由映射
 
-## 实施与验收切片
+| Lovable 页面与组件 | 现有 Next.js 页面 | 必须保留的业务适配 |
+|---|---|---|
+| src/routes/index.tsx | / | 原版首页 JSX、海报/视频、遮罩、颗粒、标题、双身份线轨及转场；身份只作为 intent 导航参数 |
+| src/routes/auth.tsx | /sign-in | 原版窄卡片、留白、色点与输入框；表单提交到现有 signInAction，不提供任意邮箱演示登录 |
+| ProductShell.tsx | 现有企业与大厅公共壳 | 迁入 56px 导航、品牌、身份色点和活动下划线；使用 Next Link、现有退出 Action 与服务端身份 |
+| src/routes/requester.tsx / RequirementStudio.tsx | /enterprise/projects/new 与项目 /spec | 保留需求输入/Spec outline 双栏；先持久化草稿，接现有 AIPM 访谈与 Spec 服务 |
+| src/routes/requester_.projects.index.tsx | /enterprise/projects | 保留状态计数与紧凑行列表；只呈现真实 DRAFT/OPEN 项目及服务端数据 |
+| src/routes/builder.tsx | /projects | 保留搜索、计数、卡片密度与响应式三列/两列/单列；只显示真实 OPEN 项目，不伪造分类、技能或统计 |
+| WorkspaceView.tsx | /enterprise/projects/[projectId]、/spec、/publish | 保留摘要、操作条、里程碑轴和标签页；真实预算、锁定、付款来自 S1。验收入口在 S0/S1 禁用，不接入本机演示状态 |
+| SpecDocument.tsx | 企业 Spec 阅读、脱敏预览与招募详情 | 保留目录、编号、章节分隔和内容卡；数据取完整 SpecDocumentV1 或白名单快照 DTO |
 
-1. **设计基础与首页**：品牌样式、Tailwind v4/PostCSS、公开首页与身份意图入口。
-2. **登录与草稿**：身份导航、登录/onboarding 视觉、真实项目列表、草稿与预算。
-3. **访谈与 Spec**：访谈工作台、完整结构化编辑、候选、历史与锁定。
-4. **发布与招募**：Mock 定金、脱敏编辑、发布预览、大厅和详情。
-5. **整体验收与文档**：端到端链路、浏览器适配、验证记录和交接。
+允许的视觉适配仅限业务差异：真实身份与项目数据、单独的登录动作、先创建草稿、完整 Spec 字段、服务端预算/支付状态、招募脱敏快照，以及本轮尚未开放的验收入口。不得因此改写不相关的页面构图、字体、颜色、间距或断点。
 
-每个小任务完成对应验证后形成一个本地 commit。push、PR、merge 和部署不在本次授权范围。
+## 3. 忠实还原规则
 
-## 当前完成度
+1. 原版 JSX 层次、Tailwind 类、尺寸、间距、字体、颜色、图标、按钮 variant 和响应式断点作为页面基准。
+2. 使用原版 OKLCH tokens、IBM Plex Sans、Noto Sans SC、纸张网格、遮罩、颗粒及动画；不再用 CSS 圆环、额外标语或自绘机械图形替换来源素材。
+3. 首页在可播放时用本地浅色视频，海报先行并作为加载/失败/减少动态效果的静态画面。视频从本站路径加载，不依赖 Lovable 私有地址。
+4. 业务写入仍走现有 Server Actions、身份校验、资源授权、expectedVersion 和数据库约束；不引入 TanStack 路由、Lovable Auth、localStorage 业务状态或新 HTTP API。
+5. 更新对应页面 E2E 断言：验证原版关键构图和素材，不再断言首页不存在图片/视频或必须绘制三个圆环。
+6. 不因截图基线更新掩盖差异。截图固定字体、动画状态、视口与数据状态；动态视频另行验证。
 
-- [x] 来源项目与源码提交已冻结。
-- [x] 首页与品牌基础已迁入第一版。
-- [x] 登录意图、onboarding 和 S0 项目列表/创建/详情入口。
-- [x] 双栏访谈工作台、SpecDocumentV1 全字段结构化编辑、稳定 ID/引用管理、周期校验、未保存修改保护、候选采用、历史与锁定。
-- [x] Mock 定金、结构化脱敏编辑、发布确认、标题/目标检索及白名单招募详情。
-- [x] 浏览器整体验收（桌面、移动、键盘、减少动态效果与外部素材不可用）、全量回归和交接文档。
+## 4. 实施状态与验收
 
-## 整体验收记录（2026-09-25）
+| 任务 | 状态 |
+|---|---|
+| 1. 来源冻结、页面映射、隔离原版环境与三视口基准截图 | 已完成：115 个文件哈希已记录；21 张基准截图采集成功；浅色视频资源可取得 |
+| 2. 原版视觉基础、字体和实际使用的组件 | 待实施 |
+| 3. 首页、真实登录和公共导航 | 待实施 |
+| 4. 我的项目、大厅与真实项目详情 | 待实施 |
+| 5. 需求工作台、访谈和详情标签结构 | 待实施 |
+| 6. 完整 Spec、锁定和发布流程外观 | 待实施 |
+| 7. 视觉、交互、业务、权限、移动端回归及交付记录 | 待实施 |
 
-- `corepack pnpm typecheck`：通过；`corepack pnpm lint`：通过。
-- `corepack pnpm test`：10 个文件、91 个用例通过；`corepack pnpm test:integration`：9 个文件、115 个真实本地 Supabase/PostgreSQL 用例通过。
-- `corepack pnpm build`：生产构建通过，共 11 条 App Router 路由。
-- `$env:CI='true'; corepack pnpm test:e2e`：9 个真实浏览器用例通过（41.1 秒）；CI 设置让 Playwright 不复用现有服务，并由 `webServer` 新建生产构建与服务。
-- 截图检查覆盖首页桌面 1440×900、首页手机 390×844、Spec 工作台桌面双栏/手机单栏、招募列表与详情的桌面和手机布局；E2E 断言手机宽度无横向溢出、首页身份入口竖排、键盘顺序导航、减少动态效果和结构完整的脱敏招募信息。截图只保存在 Git 忽略的 `test-results/`。
-- 首页无图片、视频或 Lovable 私有素材请求；页面的 CSS 品牌图形可离线显示，身份链接仍能打开登录页。
-- 本轮未添加 HTTP API、数据库表或 migration；读写继续经既有服务层、Server Actions 与权限校验。
+本轮从集成分支 feat/lovable-ui-s0-s1 的 870ccb7 建立 codex/lovable-ui-parity。原有 docs/PROJECT_STATUS.md 与 next-env.d.ts 工作区改动必须原样保留，不能进入本轮 commit。默认只做本地 commit，不 push、PR、merge 或部署。
+
+第一阶段先交付首页、登录和公共导航的原版布局与样式，并提供原版/接入版同视口对照图；此阶段结果可查看后，再沿用同一套基础迁移业务页面。整体完成之前不宣称 UI 还原验收通过。

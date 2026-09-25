@@ -13,6 +13,7 @@ coverage/
 playwright/.auth/
 playwright-report/
 test-results/
+/artifacts/ui-parity/
 *.tsbuildinfo
 
 # Local Supabase state
