@@ -83,6 +83,23 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   await expect(page.getByText("还没有项目，从一个想法开始。" )).toBeVisible();
   await expect(page.getByRole("link", { name: "开始需求" })).toHaveAttribute("href", "/enterprise/projects/new");
   await page.getByRole("link", { name: "开始需求" }).click();
+  await expect(page.getByRole("heading", { name: "有什么想做的项目？" })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const inputPanel = await page.getByTestId("new-project-input-panel").boundingBox();
+  const outlinePanel = await page.getByTestId("new-project-outline").boundingBox();
+  expect(inputPanel).not.toBeNull();
+  expect(outlinePanel).not.toBeNull();
+  expect(outlinePanel!.x).toBeGreaterThan(inputPanel!.x);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: test.info().outputPath("new-project-desktop.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  await page.screenshot({ path: test.info().outputPath("new-project-tablet.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  await page.screenshot({ path: test.info().outputPath("new-project-mobile.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByLabel("项目标题").fill("E2E 原始项目");
   await page.getByLabel("原始需求").fill("需要一个可持久化且隔离的草稿。");
   await page.getByRole("button", { name: "创建草稿" }).click();
@@ -92,6 +109,7 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   const projectPath = projectUrl.pathname;
   await expect(page.getByRole("heading", { name: "E2E 原始项目" })).toBeVisible();
   await page.reload();
+  await page.getByText("编辑项目说明", { exact: true }).click();
   await expect(page.getByLabel("项目标题")).toHaveValue("E2E 原始项目");
 
   await insertVisualDrafts(adminSql, enterpriseAUserId);
@@ -121,16 +139,32 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   await expect(page.locator("main ul a")).toHaveCount(7);
   await page.goto(projectPath);
 
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.getByText("验收将在项目开工和交付后开放。" )).toBeVisible();
+  await expect(page.getByRole("button", { name: "验收" })).toBeDisabled();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: test.info().outputPath("project-overview-desktop.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  await page.screenshot({ path: test.info().outputPath("project-overview-tablet.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  await page.screenshot({ path: test.info().outputPath("project-overview-mobile.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
   const staleEditor = await page.context().newPage();
   await staleEditor.goto(projectPath);
-  await expect(staleEditor.getByText("草稿 · 版本 1")).toBeVisible();
+  await expect(staleEditor.getByRole("heading", { name: "E2E 原始项目" })).toBeVisible();
+  await staleEditor.getByText("编辑项目说明", { exact: true }).click();
 
+  await page.getByText("编辑项目说明", { exact: true }).click();
   await page.getByLabel("项目标题").fill("窗口一保存成功");
   await page.getByLabel("原始需求").fill("第一个编辑窗口的内容必须保留。");
   await page.getByRole("button", { name: "保存草稿" }).click();
   await expect(page).toHaveURL(new RegExp(`${projectPath.replaceAll("/", "\\/")}\\?saved=1$`));
   await expect(page.getByText("草稿已保存。")).toBeVisible();
-  await expect(page.getByText("草稿 · 版本 2")).toBeVisible();
+  await expect(page.getByText(/项目版本 2/)).toBeVisible();
 
   await staleEditor.getByLabel("项目标题").fill("窗口二不应覆盖");
   await staleEditor.getByRole("button", { name: "保存草稿" }).click();
@@ -138,6 +172,7 @@ test("a draft persists while other enterprises and Builders remain isolated", as
     "项目已被更新",
   );
   await page.reload();
+  await page.getByText("编辑项目说明", { exact: true }).click();
   await expect(page.getByLabel("项目标题")).toHaveValue("窗口一保存成功");
 
   const enterpriseBContext = await browser.newContext({ baseURL: "http://127.0.0.1:3000" });
@@ -161,6 +196,7 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   await expect(page).toHaveURL(/\/sign-in$/);
   await login(page, "enterprise-a@qianzo.local");
   await page.goto(projectPath);
+  await page.getByText("编辑项目说明", { exact: true }).click();
   await expect(page.getByLabel("项目标题")).toHaveValue("窗口一保存成功");
-  await expect(page.getByText("草稿 · 版本 2")).toBeVisible();
+  await expect(page.getByText(/项目版本 2/)).toBeVisible();
 });

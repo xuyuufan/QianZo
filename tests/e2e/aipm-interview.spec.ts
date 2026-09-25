@@ -245,10 +245,49 @@ test("a draft becomes a published recruitment project end to end", async ({
 
   // Reference budget lives on the project overview and is saved exactly.
   await page.getByRole("link", { name: "← 返回项目总览" }).click();
+  await expect(page.getByRole("heading", { name: "E2E 访谈项目" })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("project-overview-with-spec-desktop.png"), fullPage: true, animations: "disabled" });
+  await page.goto(`${projectPath}?tab=spec`);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.getByRole("navigation", { name: "Spec 文档目录" }).getByRole("link")).toHaveCount(11);
+  await expect(page.getByRole("heading", { name: "页面结构" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "用户流程" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "技术约束" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "范围外事项" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "假设" })).toBeVisible();
+  await expect(page.getByText(/验证方式：E2E：逐条核对现场操作结果与验收清单。/)).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("project-spec-read-desktop.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("project-spec-read-tablet.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("project-spec-read-mobile.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${projectPath}?tab=milestones`);
+  await expect(page.getByRole("heading", { name: "里程碑计划" })).toBeVisible();
+  await expect(page.getByText("验证方法：E2E：逐条核对现场操作结果与验收清单。")).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("project-milestones-desktop.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("project-milestones-tablet.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("project-milestones-mobile.png"), fullPage: true, animations: "disabled" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(projectPath);
+  await page.getByText("补充参考预算", { exact: true }).click();
   await page.getByLabel("参考预算下限（CNY）").fill("1000");
   await page.getByLabel("参考预算上限（CNY）").fill("2500.50");
   await page.getByRole("button", { name: "保存参考预算" }).click();
   await expect(page.getByText(/参考预算已保存：¥1000\.00 – ¥2500\.50/)).toBeVisible();
+
+  const staleLockedEditor = await page.context().newPage();
+  await staleLockedEditor.goto(projectPath);
+  await staleLockedEditor.getByText("编辑项目说明", { exact: true }).click();
 
   // Locking freezes the reviewed scope.
   await page.getByRole("link", { name: "需求访谈与 Spec" }).click();
@@ -261,13 +300,14 @@ test("a draft becomes a published recruitment project end to end", async ({
 
   // The original draft entry point can no longer rewrite the frozen scope.
   await page.getByRole("link", { name: "← 返回项目总览" }).click();
-  await expect(page.getByText(/已锁定 Spec 版本：标题、原始需求与参考预算已冻结/)).toBeVisible();
-  await page.getByLabel("项目标题").fill("锁定后改名");
-  await page.getByRole("button", { name: "保存草稿" }).click();
-  await expect(page.locator('[data-error-code="SPEC_LOCKED"]')).toContainText("已锁定评审范围");
+  await expect(page.getByText(/已锁定 Spec 版本：标题、原始需求、参考预算与当前 Spec 已冻结/)).toBeVisible();
+  await staleLockedEditor.getByLabel("项目标题").fill("锁定后改名");
+  await staleLockedEditor.getByRole("button", { name: "保存草稿" }).click();
+  await expect(staleLockedEditor.locator('[data-error-code="SPEC_LOCKED"]')).toContainText("已锁定评审范围");
+  await staleLockedEditor.close();
 
   // Mock enterprise deposit: a fixed demo amount with a simulated success.
-  await page.getByRole("link", { name: "企业定金与发布" }).click();
+  await page.getByRole("link", { name: "Mock 定金与发布" }).click();
   await expect(page).toHaveURL(new RegExp(`${projectPath.replaceAll("/", "\\/")}/publish$`));
   await expect(page.getByRole("heading", { name: "已锁定的范围" })).toBeVisible();
   await page.getByRole("button", { name: "创建企业模拟定金" }).click();
@@ -307,9 +347,9 @@ test("a draft becomes a published recruitment project end to end", async ({
   // Publishing locks the scope, but the enterprise detail must still report the
   // real status instead of falling back to DRAFT.
   await page.goto(projectPath);
-  await expect(page.getByText(/已发布 · 版本 \d+/)).toBeVisible();
-  await expect(page.locator(".status-pill")).toHaveText("OPEN · 已锁定范围");
-  await expect(page.getByText("DRAFT · 已锁定范围")).toHaveCount(0);
+  await expect(page.getByText(/项目版本 \d+/)).toBeVisible();
+  await expect(page.getByText("招募中", { exact: true })).toBeVisible();
+  await expect(page.getByText("范围已锁定", { exact: true })).toHaveCount(0);
 
   const privateMessage = "ZZSECRET-访谈：我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。";
   const privateRequirement = "ZZSECRET-原始需求：需要把访谈整理成可招募的确认范围。";
