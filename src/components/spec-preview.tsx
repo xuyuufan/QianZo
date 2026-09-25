@@ -1,3 +1,5 @@
+"use client";
+
 import { specDeliveryDays, type SpecDocumentV1 } from "@/modules/specs/document";
 
 /**

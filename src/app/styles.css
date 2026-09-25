@@ -750,6 +750,29 @@ body { background: var(--paper); }
 .spec-editor-actions { align-items: center; }
 .spec-editor-actions .spec-muted { flex: 1 1 14rem; }
 .spec-review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 1rem; }
+.structured-mask-form { display: grid; gap: 1rem; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.structured-mask-form > .field { max-width: 44rem; }
+.structured-mask-form .mask-editor-notice { padding: .85rem 1rem; border-left: 2px solid var(--accent); background: #f4f1e9; color: #4e5047; font-size: .8rem; line-height: 1.55; }
+.mask-editor-notice p { margin: .25rem 0 0; }
+.spec-mask-sections { display: grid; gap: .85rem; }
+.structured-mask-form .spec-editor-section { gap: .85rem; }
+.structured-mask-form .field { min-width: 0; gap: .35rem; font-size: .78rem; font-weight: 600; }
+.structured-mask-form .field > span { display: flex; align-items: baseline; flex-wrap: wrap; gap: .4rem; }
+.structured-mask-form .field small { color: var(--muted); font-size: .68rem; font-weight: 400; }
+.structured-mask-form .field input,.structured-mask-form .field textarea { min-height: 2.65rem; padding: .65rem .7rem; border-color: #d4d3c8; border-radius: 0; background: #fffefa; font-size: .84rem; }
+.structured-mask-form .field textarea { min-height: 5.6rem; line-height: 1.55; }
+.structured-mask-form .field input:disabled { background: #efeee8; color: var(--muted); opacity: 1; }
+.structured-mask-form .field input[aria-invalid="true"],.structured-mask-form .field textarea[aria-invalid="true"] { border-color: #a64134; }
+.structured-mask-form .field-error { color: #9a3026 !important; font-size: .72rem !important; font-weight: 550 !important; }
+.structured-mask-form .reference-choices input:disabled { opacity: .75; }
+.masked-preview-panel { border-color: #cccbbf; background: #f7f6ef; box-shadow: none; }
+.masked-preview-panel .eyebrow { margin-bottom: .45rem; font-size: .58rem; letter-spacing: .15em; }
+.structured-mask-form > .choice-card { max-width: 44rem; }
+.recruitment-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
+.recruitment-toolbar .field { width: min(100%, 38rem); }
+.recruitment-toolbar input { border-radius: 0; border-color: #cbcbbf; background: #fffefa; }
+.recruitment-toolbar .spec-count { padding-bottom: .85rem; }
+.recruitment-results { min-width: 0; }
 
 @media (max-width: 58rem) {
   .spec-workspace-grid { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: .8rem; }
@@ -767,6 +790,8 @@ body { background: var(--paper); }
   .spec-review-grid { grid-template-columns: 1fr; }
   .string-list-row { grid-template-columns: 1fr; }
   .string-row-actions { justify-content: flex-end; }
+  .recruitment-toolbar { align-items: stretch; flex-direction: column; }
+  .recruitment-toolbar .spec-count { padding-bottom: 0; }
 }
 
 @media (max-width: 45rem) {

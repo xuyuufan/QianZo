@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useActionState, useContext, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 
 import { emptySpecActionState } from "@/app/actions/spec-state";
 import { saveSpecVersionAction } from "@/app/actions/specs";
+import { SpecField as Field, SpecFieldIssueProvider } from "@/components/spec-field";
 import {
   specDocumentSchema,
   type SpecDocumentV1,
@@ -24,8 +25,6 @@ type SpecEditorFormProps = {
   version: number;
   initialContent: string;
 };
-
-const FieldIssueContext = createContext<Array<{ path: string; message: string }>>([]);
 
 export function SpecEditorForm({ projectId, version, initialContent }: SpecEditorFormProps) {
   const action = saveSpecVersionAction.bind(null, projectId);
@@ -133,7 +132,7 @@ export function SpecEditorForm({ projectId, version, initialContent }: SpecEdito
     <form action={formAction} className="project-form spec-structured-form" data-testid="structured-spec-editor">
       <input name="expectedVersion" type="hidden" value={version} />
       <input name="document" type="hidden" value={content} />
-      <FieldIssueContext.Provider value={validation.paths}>
+      <SpecFieldIssueProvider value={validation.paths}>
       <div className="spec-editor-toolbar">
         <div>
           <p className="eyebrow">STRUCTURED SPEC · V1</p>
@@ -302,7 +301,7 @@ export function SpecEditorForm({ projectId, version, initialContent }: SpecEdito
         </button>
         {unsaved ? <span className="spec-muted">离开编辑页会提示你确认是否放弃修改。</span> : null}
       </div>
-      </FieldIssueContext.Provider>
+      </SpecFieldIssueProvider>
     </form>
   );
 
@@ -332,33 +331,6 @@ function createMilestone(id: string, dueAfterDays: number): SpecMilestone {
 
 function toggle(values: readonly string[], value: string) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
-}
-
-function Field({
-  label,
-  path,
-  value,
-  onChange,
-  multiline = false,
-  optional = false,
-}: {
-  label: string;
-  path: string;
-  value: string;
-  onChange: (value: string) => void;
-  multiline?: boolean;
-  optional?: boolean;
-}) {
-  const fieldId = `field-${path.replaceAll(/[^A-Za-z0-9_-]/g, "-")}`;
-  const paths = useContext(FieldIssueContext);
-  const issue = paths.find((entry) => entry.path === path);
-  return (
-    <label className="field" htmlFor={fieldId}>
-      <span>{label}{optional ? <small>（可选）</small> : null}</span>
-      {multiline ? <textarea id={fieldId} value={value} onChange={(event) => onChange(event.currentTarget.value)} aria-invalid={Boolean(issue)} rows={3} /> : <input id={fieldId} value={value} onChange={(event) => onChange(event.currentTarget.value)} aria-invalid={Boolean(issue)} />}
-      {issue ? <small className="field-error">{issue.message}</small> : null}
-    </label>
-  );
 }
 
 function FieldError({ path, paths }: { path: string; paths: Array<{ path: string; message: string }> }) {

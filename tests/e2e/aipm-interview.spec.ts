@@ -192,6 +192,12 @@ test("a draft becomes a published recruitment project end to end", async ({
     .getByLabel("验证方法")
     .first()
     .fill("E2E：逐条核对现场操作结果与验收清单。");
+  const expectedCriteria = await Promise.all(
+    (await editor.locator(".spec-criterion-card").all()).map(async (criterion) => ({
+      description: await criterion.getByLabel("验收标准").inputValue(),
+      verificationMethod: await criterion.getByLabel("验证方法").inputValue(),
+    })),
+  );
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("Spec 还有未保存修改");
     await dialog.dismiss();
@@ -251,12 +257,19 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(page.getByRole("button", { name: "创建企业模拟定金" })).toHaveCount(0);
 
   // Masked preview: only text may change, then the final preview is confirmed.
-  const previewEditor = page.getByLabel("脱敏预览（JSON）");
-  await expect(previewEditor).toBeVisible();
+  const maskedEditor = page.getByTestId("structured-masked-spec-editor");
+  await expect(maskedEditor.locator(".spec-editor-section")).toHaveCount(11);
   await expect(page.getByText("结构与锁定版本一致，可以确认发布。")).toBeVisible();
-  const maskedContent = (await previewEditor.inputValue()).replaceAll("ZZSECRET-访谈：", "");
-  await previewEditor.fill(maskedContent);
-  await page.getByLabel("招募标题（脱敏后）").fill("E2E 招募项目（脱敏）");
+  const maskedDocumentField = maskedEditor.locator('input[name="maskedDocument"]');
+  const lockedDocument = JSON.parse(await maskedDocumentField.inputValue());
+  await expect(maskedEditor.locator(".editor-add-button")).toHaveCount(0);
+  await expect(maskedEditor.locator(".reference-choices input").first()).toBeDisabled();
+  await expect(maskedEditor.getByRole("spinbutton").first()).toBeDisabled();
+  const publicGoal = "面向需求与交付协作的项目确认和验收工作台。";
+  await maskedEditor.getByLabel("项目目标").fill(publicGoal);
+  const editedMaskedDocument = JSON.parse(await maskedDocumentField.inputValue());
+  expect(editedMaskedDocument).toEqual({ ...lockedDocument, projectGoal: publicGoal });
+  await maskedEditor.getByLabel("招募标题（脱敏后）").fill("E2E 招募项目（脱敏）");
   await expect(page.getByRole("button", { name: "确认并发布招募" })).toBeDisabled();
   await page.getByRole("checkbox", { name: /我已确认这是最终预览/ }).check();
   await page.getByRole("button", { name: "确认并发布招募" }).click();
@@ -295,6 +308,14 @@ test("a draft becomes a published recruitment project end to end", async ({
   // The published project shows up in the recruitment view, masked.
   await builderPage.goto("/projects");
   await expect(builderPage.getByRole("link", { name: /E2E 招募项目（脱敏）/ })).toBeVisible();
+  const recruitmentSearch = builderPage.getByLabel("搜索招募项目");
+  await recruitmentSearch.fill("需求与交付协作");
+  await expect(builderPage.getByRole("link", { name: /E2E 招募项目（脱敏）/ })).toBeVisible();
+  await recruitmentSearch.fill("不存在的项目关键词");
+  await expect(builderPage.getByText("没有匹配的项目")).toBeVisible();
+  await recruitmentSearch.fill("E2E 招募项目");
+  await expect(builderPage.getByRole("link", { name: /E2E 招募项目（脱敏）/ })).toBeVisible();
+  await recruitmentSearch.fill("");
   const recruitmentResponse = await builderPage.goto(`/projects/${projectId}`);
   const recruitmentBody = (await recruitmentResponse?.text()) ?? "";
   expect(recruitmentBody).not.toContain("ZZSECRET");
@@ -308,6 +329,12 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(publishedBudget).toContainText("30 个自然日");
   await expect(builderPage.getByText(/不是成交价或报价/)).toBeVisible();
   await expect(builderPage.getByText("里程碑与验收")).toBeVisible();
+  const publicCriteria = builderPage.locator("[data-testid='recruitment-snapshot'] .spec-milestone li");
+  await expect(publicCriteria).toHaveCount(expectedCriteria.length);
+  for (const [index, criterion] of expectedCriteria.entries()) {
+    await expect(publicCriteria.nth(index)).toContainText(criterion.description);
+    await expect(publicCriteria.nth(index)).toContainText(criterion.verificationMethod);
+  }
   // A draft of the same enterprise stays invisible to the builder.
   expect(recruitmentBody).not.toContain("未发布");
   await builderContext.close();
