@@ -15,7 +15,7 @@ export function InterviewForm({ projectId, version }: InterviewFormProps) {
   const [state, formAction, pending] = useActionState(action, emptyAipmActionState);
 
   return (
-    <form action={formAction} className="project-form">
+    <form action={formAction} className="form-stack">
       <input name="expectedVersion" type="hidden" value={version} />
       <label className="field">
         <span>访谈回复</span>

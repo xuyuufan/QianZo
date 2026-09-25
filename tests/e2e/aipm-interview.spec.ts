@@ -126,18 +126,33 @@ test("a draft becomes a published recruitment project end to end", async ({
     .fill("功能范围是需求整理、范围确认与锁定；验收标准按里程碑逐条核对。");
   await page.getByRole("button", { name: "生成候选 Spec" }).click();
   await expect(page.getByText("候选 Spec 已生成，可在下方预览。")).toBeVisible();
+  await page.getByRole("tab", { name: "访谈候选" }).click();
+  await page.getByRole("tab", { name: "访谈候选" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("structured-spec-editor")).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("spec-candidate-panel")).toBeVisible();
   await expect(page.getByRole("heading", { name: "最新候选 Spec" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "里程碑与验收" })).toBeVisible();
   await expect(page.getByText("第 14 个自然日")).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: test.info().outputPath("spec-workbench-candidate-desktop.png"), fullPage: true, animations: "disabled" });
 
   // A new candidate must not overwrite a manual edit already in progress.
   const editor = page.getByTestId("structured-spec-editor");
+  await page.getByRole("tab", { name: "编辑 Spec" }).click();
   await expect(editor.locator(".spec-editor-section")).toHaveCount(11);
   await editor.getByLabel("项目目标").fill("保留的未保存目标：先确认访谈内容，再确认交付范围。");
   await page
     .getByLabel("访谈回复")
     .fill("请明确企业负责人和交付方的职责，并按里程碑逐项验证验收标准。");
   await page.getByRole("button", { name: "生成候选 Spec" }).click();
+  await expect(page.getByText("候选 Spec 已生成，可在下方预览。")).toBeVisible();
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("Spec 有未保存修改");
+    await dialog.accept();
+  });
+  await page.getByRole("tab", { name: "访谈候选" }).click();
   await expect(page.locator('li[data-role="USER"]')).toHaveCount(3);
   await expect(page.locator('li[data-role="ASSISTANT"]')).toHaveCount(3);
   await expect(page.getByText("候选 Spec 已生成，可在下方预览。")).toBeVisible();
@@ -146,7 +161,7 @@ test("a draft becomes a published recruitment project end to end", async ({
   );
   await expect(editor.locator(".editor-save-state")).toContainText("有未保存修改");
   const secondCandidateGoal = await page
-    .locator(".spec-candidate-panel .spec-section")
+    .locator('.spec-candidate-panel [data-testid="spec-document-section"]')
     .filter({ has: page.getByRole("heading", { name: "项目目标" }) })
     .locator("p")
     .first()
@@ -160,6 +175,7 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(adoptionVersion).toHaveValue(String(databaseProject.version));
   await page.getByRole("button", { name: "采用为当前 Spec 版本" }).click();
   await expect(page.getByText("该候选已采用为版本 1，历史版本不会被覆盖。")).toBeVisible();
+  await page.getByRole("tab", { name: "当前版本" }).click();
   await expect(page.getByRole("heading", { name: "Spec 版本 1（当前）" })).toBeVisible();
   await expect(page.getByText("当前 Spec 版本 1")).toBeVisible();
 
@@ -167,6 +183,8 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(editor.getByLabel("项目目标")).toHaveValue(
     "保留的未保存目标：先确认访谈内容，再确认交付范围。",
   );
+
+  await page.getByRole("tab", { name: "编辑 Spec" }).click();
 
   // New IDs remain stable as rows move or fields change. Linked entries must
   // first be unlinked before they can be removed.
@@ -231,11 +249,13 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(page).toHaveURL(new RegExp(`${projectPath.replaceAll("/", "\\/")}/spec$`));
   await page.getByRole("button", { name: "保存为新版本" }).click();
   await expect(page.getByText("已保存为版本 2。")).toBeVisible();
+  await page.getByRole("tab", { name: "当前版本" }).click();
   await expect(page.getByRole("heading", { name: "Spec 版本 2（当前）" })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole("link", { name: "版本 2" })).toBeVisible();
-  await page.getByRole("link", { name: "版本 1" }).click();
+  await page.getByRole("tab", { name: "版本历史" }).click();
+  await expect(page.getByRole("button", { name: "v2 · 当前" })).toBeVisible();
+  await page.getByRole("button", { name: "v1" }).click();
   const reviewedVersion = page.getByTestId("spec-version-detail");
   await expect(reviewedVersion.getByText("这是历史版本，不会被修改")).toBeVisible();
   // The first version still holds what was adopted, not the later edit; the
@@ -291,6 +311,11 @@ test("a draft becomes a published recruitment project end to end", async ({
 
   // Locking freezes the reviewed scope.
   await page.getByRole("link", { name: "需求访谈与 Spec" }).click();
+  await page.getByText("核对将要锁定的内容").click();
+  await expect(page.getByText("E2E 访谈项目", { exact: true }).last()).toBeVisible();
+  await expect(page.getByText("ZZSECRET-原始需求：需要把访谈整理成可招募的确认范围。")).toBeVisible();
+  await expect(page.getByText("¥1000.00 – ¥2500.50")).toBeVisible();
+  await page.getByRole("checkbox", { name: /我已核对标题、原始需求、参考预算和 Spec v2/ }).check();
   await page.getByRole("button", { name: "确认锁定当前版本" }).click();
   await expect(page.getByText(/已锁定 Spec 版本 2/)).toBeVisible();
   await expect(
@@ -336,6 +361,9 @@ test("a draft becomes a published recruitment project end to end", async ({
   expect(editedMaskedDocument).toEqual({ ...lockedDocument, projectGoal: publicGoal });
   await maskedEditor.getByLabel("招募标题（脱敏后）").fill("E2E 招募项目（脱敏）");
   await expect(page.getByRole("button", { name: "确认并发布招募" })).toBeDisabled();
+  await page.getByRole("tab", { name: "最终招募预览" }).click();
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: test.info().outputPath("publish-masked-preview-desktop.png"), fullPage: true, animations: "disabled" });
   await page.getByRole("checkbox", { name: /我已确认这是最终预览/ }).check();
   await page.getByRole("button", { name: "确认并发布招募" }).click();
   // The publish form is replaced by the published state once the intent succeeded.
@@ -419,7 +447,7 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(publishedBudget).toContainText("30 个自然日");
   await expect(builderPage.getByText(/不是成交价或报价/)).toBeVisible();
   await expect(builderPage.getByText("里程碑与验收")).toBeVisible();
-  const publicCriteria = builderPage.locator("[data-testid='recruitment-snapshot'] .spec-milestone li");
+  const publicCriteria = builderPage.locator("[data-testid='recruitment-snapshot'] [data-testid='public-acceptance-criterion']");
   await expect(publicCriteria).toHaveCount(expectedCriteria.length);
   for (const [index, criterion] of expectedCriteria.entries()) {
     await expect(publicCriteria.nth(index)).toContainText(criterion.description);

@@ -24,9 +24,10 @@ type SpecEditorFormProps = {
   projectId: string;
   version: number;
   initialContent: string;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
-export function SpecEditorForm({ projectId, version, initialContent }: SpecEditorFormProps) {
+export function SpecEditorForm({ projectId, version, initialContent, onDirtyChange }: SpecEditorFormProps) {
   const action = saveSpecVersionAction.bind(null, projectId);
   const [state, formAction, pending] = useActionState(action, emptySpecActionState);
   const [editorDraft, setEditorDraft] = useState(() => ({
@@ -44,6 +45,10 @@ export function SpecEditorForm({ projectId, version, initialContent }: SpecEdito
   const syncedContent = serverSync?.syncedContent ?? editorDraft.syncedContent;
   const content = useMemo(() => JSON.stringify(document, null, 2), [document]);
   const unsaved = content !== syncedContent;
+
+  useEffect(() => {
+    onDirtyChange?.(unsaved);
+  }, [onDirtyChange, unsaved]);
 
   useEffect(() => {
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {

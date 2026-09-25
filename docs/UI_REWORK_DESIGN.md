@@ -51,9 +51,25 @@
 | 3. 首页、真实登录和公共导航 | 已完成：逐页还原首页海报/视频、线轨与转场；真实登录窄卡、Onboarding 同视觉语言、56px 双身份导航与 Server Action 退出；5 项首页 E2E、4 项 Auth/Onboarding E2E 通过。原版与集成版截图位于 artifacts/ui-parity/{original,integrated}/ |
 | 4. 我的项目与项目大厅 | 已完成：恢复紧凑项目行列表、真实 DRAFT/OPEN 筛选与计数，以及桌面三列/平板两列/手机单列大厅卡片；E2E 用一个真实流程项目加六条临时合成记录对照七行/七卡片布局，数据在用例结束后清理 |
 | 5. 需求草稿工作台与项目详情 | 已完成：草稿页恢复输入/Spec outline 双栏；项目总览接入真实状态、预算、版本与计划里程碑，标签分屏展示 Overview、当前/历史 Spec、里程碑；验收标签禁用并注明开工交付后开放 |
-| 6. 访谈编辑器、完整 Spec 与发布流程 | 待实施 |
-| 7. 视觉、交互、业务、权限、移动端回归及交付记录 | 待实施 |
+| 6. 访谈编辑器、完整 Spec 与发布流程 | 实现完成，真实 Auth/PostgreSQL 端到端验收待环境恢复 |
+| 7. 视觉、交互、业务、权限、移动端回归及交付记录 | 部分完成：静态检查、单元测试和生产构建通过；集成/E2E 被本地 Supabase 不可用阻断 |
 
 本轮从集成分支 feat/lovable-ui-s0-s1 的 870ccb7 建立 codex/lovable-ui-parity。原有 docs/PROJECT_STATUS.md 与 next-env.d.ts 工作区改动必须原样保留，不能进入本轮 commit。默认只做本地 commit，不 push、PR、merge 或部署。
 
-首页、登录、公共导航、我的项目、项目大厅、需求草稿双栏工作台和项目详情框架已完成首轮迁移。大厅只呈现真实 OPEN 白名单快照；无后端依据的分类和技能标签已移除。项目详情的 Spec 标签使用完整 SpecDocumentV1 阅读视图，版本历史可切换，里程碑页展示实际验收标准和验证方法；编辑仍经现有项目 Spec 页面完成。E2E 在本地数据库用真实流程项目和六条短文本合成记录核对七行/七卡片密度，合成记录由测试清理；项目详情权限与草稿并发用例通过。全流程 AIPM E2E 额外验证了 Spec 阅读字段、自然日轴、预算、锁定、付款、脱敏发布和招募浏览，桌面/平板/手机 Spec 与里程碑页无横向溢出。`typecheck`、`lint`、91 项单元测试和两项相关 E2E 均通过。截图位于 artifacts/ui-parity/{original,integrated}/；当前集成截图来自开发服务器并带 Next.js 开发指示器，整体验收时需从生产服务器重采，之后再作最终视觉对照。访谈编辑器和发布/招募详情的原版样式迁移仍待完成，整体 UI 还原尚未验收。
+任务 6 已迁入原版细线章节和双栏工作区：访谈候选、当前 Spec、只读历史、结构化编辑分视图切换；锁定前展示版本、标题、原始需求和预算并要求确认；发布页以步骤条、定金区和完整脱敏预览承载现有 S1 动作。招募详情继续只读取安全快照 DTO，验收标准与验证方式逐条展示。编辑器仍复用现有字段往返、稳定 ID、引用约束、周期校验、错误定位、版本冲突和未保存修改保护逻辑。
+
+任务 6 的视觉检查截图位于 `artifacts/ui-parity/integrated/task6/`：候选、编辑器（桌面/平板/手机）、脱敏编辑/预览和招募详情（桌面/手机）。截图使用临时合成数据预览入口渲染实际页面组件，采集后已删除该入口；截图仅用于布局审阅，不代表真实会话、数据库写入、权限或业务验收。原版同视口截图保留在 `artifacts/ui-parity/original/`。正式 Auth/PostgreSQL 不可用，因此本轮无法重跑真实浏览器完整流程。
+
+### 本轮最终验证记录（2026-09-25）
+
+| 命令 | 结果 |
+|---|---|
+| `pnpm typecheck` | 通过 |
+| `pnpm lint` | 通过 |
+| `pnpm test` | 通过：10 个文件，91 项 |
+| `pnpm build` | 通过；路由清单中没有临时预览入口 |
+| `pnpm test:integration` | 未通过：8 个测试文件失败、1 个跳过；34 项失败、81 项跳过。Supabase Auth 请求失败，PostgreSQL `127.0.0.1:54322` 与 REST `127.0.0.1:54321` 连接被拒绝 |
+| `pnpm test:e2e` | 11 项中 5 项通过、3 项在 Auth `beforeAll` 因 `AuthRetryableFetchError: fetch failed` 失败、3 项未运行；未触达完整 S0/S1 流程 |
+| `pnpm db:start` | 失败：Docker Desktop 报告无法启动；没有重启可能承载用户容器的 Docker 进程 |
+
+生产构建后将 `next-env.d.ts` 精确恢复到开工前快照 `.workbuddy/next-env-before-ui-restoration.d.ts`（SHA-256 `B8B3A344484B959AF5E4E3FC1A1609DAC3CB9ECE0CDEB6C145BE29BC4C491000`）；`docs/PROJECT_STATUS.md` 的既有用户修改保留且未暂存。任务 7 的业务、权限与完整响应脱敏验收仍待 Docker/Supabase 本地服务恢复后执行，不得以截图或静态检查替代。

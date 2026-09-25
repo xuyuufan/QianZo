@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useState, type KeyboardEvent } from "react";
 
 import { emptyProjectActionState } from "@/app/actions/project-state";
 import { publishProjectAction } from "@/app/actions/publish";
 import { SpecField as Field, SpecFieldIssueProvider } from "@/components/spec-field";
-import { SpecPreview } from "@/components/spec-preview";
+import { SpecDocumentView } from "@/components/spec-document-view";
 import {
   specDocumentSchema,
   type SpecDocumentV1,
@@ -24,6 +24,27 @@ type PublishFormProps = {
 
 type TextCollection = "technicalConstraints" | "outOfScope" | "assumptions";
 
+function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+  const tabs = event.currentTarget.closest('[role="tablist"]')?.querySelectorAll<HTMLButtonElement>("[role=tab]");
+  if (!tabs?.length) return;
+
+  const index = Array.from(tabs).indexOf(event.currentTarget);
+  const nextIndex = event.key === "ArrowRight"
+    ? (index + 1) % tabs.length
+    : event.key === "ArrowLeft"
+      ? (index - 1 + tabs.length) % tabs.length
+      : event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? tabs.length - 1
+          : null;
+  if (nextIndex === null) return;
+
+  event.preventDefault();
+  tabs[nextIndex].focus();
+  tabs[nextIndex].click();
+}
+
 export function PublishForm({
   projectId,
   version,
@@ -36,6 +57,7 @@ export function PublishForm({
   const [title, setTitle] = useState(lockedTitle);
   const [document, setDocument] = useState(lockedDocument);
   const [confirmed, setConfirmed] = useState(false);
+  const [activeView, setActiveView] = useState<"edit" | "preview">("edit");
   const content = useMemo(() => JSON.stringify(document), [document]);
 
   const validation = useMemo(() => {
@@ -56,7 +78,7 @@ export function PublishForm({
   }, [document, lockedDocument]);
 
   const issues = validation.issues.length > 0 ? validation.issues : state.issues;
-  const blocked = issues.length > 0 || !confirmed;
+  const blocked = issues.length > 0 || !confirmed || activeView !== "preview";
 
   function updateDocument(update: (current: SpecDocumentV1) => SpecDocumentV1) {
     setDocument((current) => update(current));
@@ -82,13 +104,32 @@ export function PublishForm({
   return (
     <form
       action={formAction}
-      className="project-form structured-mask-form"
+      className="structured-mask-form"
       data-testid="structured-masked-spec-editor"
     >
       <input name="expectedVersion" type="hidden" value={version} />
       <input name="lockedSpecVersionId" type="hidden" value={lockedSpecVersionId} />
       <input name="maskedDocument" type="hidden" value={content} />
 
+      <div className="mb-6 flex gap-5 border-b border-border" role="tablist" aria-label="脱敏编辑与招募预览">
+        {(["edit", "preview"] as const).map((view) => (
+          <button
+            key={view}
+            id={`publish-tab-${view}`}
+            type="button"
+            role="tab"
+            aria-selected={activeView === view}
+            aria-controls={`publish-panel-${view}`}
+            onClick={() => setActiveView(view)}
+            onKeyDown={handleTabKeyDown}
+            className={`relative h-11 shrink-0 px-0 font-brand text-xs transition-colors hover:bg-transparent ${activeView === view ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {view === "edit" ? "编辑脱敏文字" : "最终招募预览"}
+          </button>
+        ))}
+      </div>
+
+      <div id="publish-panel-edit" hidden={activeView !== "edit"} role="tabpanel" aria-labelledby="publish-tab-edit">
       <label className="field">
         <span>招募标题（脱敏后）</span>
         <input
@@ -231,6 +272,8 @@ export function PublishForm({
         </div>
       </SpecFieldIssueProvider>
 
+      </div>
+
       {issues.length > 0 ? (
         <div className="spec-errors" role="alert" data-testid="masked-spec-validation-errors">
           <strong>请检查脱敏文字</strong>
@@ -238,19 +281,22 @@ export function PublishForm({
         </div>
       ) : (
         <p className="form-message success" role="status">
-          结构与锁定版本一致，可以确认发布。
+          {activeView === "preview"
+            ? "结构与锁定版本一致，请核对最终预览并勾选确认后发布。"
+            : "结构与锁定版本一致。请切换到最终招募预览核对后确认发布。"}
         </p>
       )}
 
-      <section className="project-form masked-preview-panel">
-        <div>
-          <p className="eyebrow">PUBLIC PREVIEW</p>
-          <h2 className="subsection-title">最终招募预览</h2>
+      <section id="publish-panel-preview" hidden={activeView !== "preview"} role="tabpanel" aria-labelledby="publish-tab-preview" className="min-w-0" data-testid="masked-spec-preview">
+        <div className="mb-6 border-b border-border pb-5">
+          <p className="font-brand text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Public preview</p>
+          <h2 className="mt-2 font-zh text-lg font-normal">{title}</h2>
+          <p className="mt-2 font-zh text-xs text-muted-foreground">核对对外标题与完整脱敏 Spec；项目私有访谈和原始需求不会出现在此视图。</p>
         </div>
-        <SpecPreview document={document} />
+        <SpecDocumentView document={document} />
       </section>
 
-      <label className="choice-card">
+      <label className="choice-card" hidden={activeView !== "preview"}>
         <input
           name="confirmed"
           type="checkbox"

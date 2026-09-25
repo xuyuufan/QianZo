@@ -36,14 +36,14 @@ export function SpecDocumentView({ document }: { document: SpecDocumentV1 }) {
 
       <article className="min-w-0">
         <SpecSection index={1} title={headings[0]}>
-          <p className="max-w-2xl font-zh text-sm leading-7 text-foreground">{document.projectGoal}</p>
+          <p className="max-w-2xl whitespace-pre-wrap font-zh text-sm leading-7 text-foreground">{document.projectGoal || "未指定项目目标。"}</p>
           <p className="mt-4 font-brand text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Background</p>
           <p className="mt-2 max-w-2xl whitespace-pre-wrap font-zh text-sm leading-7 text-muted-foreground">{document.background || "未填写背景说明。"}</p>
         </SpecSection>
 
         <SpecSection index={2} title={headings[1]}>
           <div className="divide-y divide-border border-y border-border">
-            {document.userRoles.map((role) => (
+            {document.userRoles.length === 0 ? <p className="py-4 font-zh text-sm text-muted-foreground">未指定</p> : document.userRoles.map((role) => (
               <div key={role.id} className="grid gap-2 py-4 sm:grid-cols-[minmax(0,160px)_minmax(0,1fr)]">
                 <div><span className="font-brand text-[10px] text-muted-foreground">{role.id}</span><h3 className="mt-1 font-zh text-sm">{role.name}</h3></div>
                 <p className="font-zh text-sm leading-6 text-muted-foreground">{role.description}</p>
@@ -64,6 +64,7 @@ export function SpecDocumentView({ document }: { document: SpecDocumentV1 }) {
                 </div>
               </div>
             ))}
+            {document.features.length === 0 ? <Empty /> : null}
           </div>
         </SpecSection>
 
@@ -107,6 +108,7 @@ export function SpecDocumentView({ document }: { document: SpecDocumentV1 }) {
           <div className="divide-y divide-border border-y border-border">
             {document.deliverables.map((item) => <div key={item.id} className="grid gap-2 py-4 sm:grid-cols-[72px_minmax(0,1fr)]"><span className="font-brand text-xs text-muted-foreground">{item.id}</span><div><h3 className="font-zh text-sm">{item.title}</h3><p className="mt-2 font-zh text-sm leading-6 text-muted-foreground">{item.description}</p></div></div>)}
           </div>
+          {document.deliverables.length === 0 ? <Empty /> : null}
         </SpecSection>
 
         <SpecSection index={9} title={headings[8]}>
@@ -123,12 +125,14 @@ export function SpecDocumentView({ document }: { document: SpecDocumentV1 }) {
                   <div className="border-t border-border pt-4">
                     <p className="font-brand text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Acceptance criteria</p>
                     <ul className="mt-3 space-y-4">
-                      {milestone.acceptanceCriteria.map((criterion) => <li key={criterion.id} className="grid gap-2 sm:grid-cols-[48px_minmax(0,1fr)]"><span className="font-brand text-[10px] text-muted-foreground">{criterion.id}</span><div><p className="font-zh text-sm leading-6">{criterion.description}</p><p className="mt-2 font-zh text-xs leading-5 text-muted-foreground">验证方式：{criterion.verificationMethod}</p></div></li>)}
+                      {milestone.acceptanceCriteria.map((criterion) => <li key={criterion.id} data-testid="public-acceptance-criterion" className="grid gap-2 sm:grid-cols-[48px_minmax(0,1fr)]"><span className="font-brand text-[10px] text-muted-foreground">{criterion.id}</span><div><p className="font-zh text-sm leading-6">{criterion.description}</p><p className="mt-2 font-zh text-xs leading-5 text-muted-foreground">验证方式：{criterion.verificationMethod}</p></div></li>)}
+                      {milestone.acceptanceCriteria.length === 0 ? <li className="font-zh text-sm text-muted-foreground">未指定</li> : null}
                     </ul>
                   </div>
                 </div>
               </section>
             ))}
+            {document.milestones.length === 0 ? <Empty /> : null}
           </div>
         </SpecSection>
 
@@ -146,7 +150,7 @@ export function SpecDocumentView({ document }: { document: SpecDocumentV1 }) {
 
 function SpecSection({ index, title, children }: { index: number; title: string; children: ReactNode }) {
   return (
-    <section id={`spec-section-${index}`} className="scroll-mt-20 border-t border-border py-8 first:border-t-0 first:pt-0">
+    <section id={`spec-section-${index}`} data-testid="spec-document-section" className="scroll-mt-20 border-t border-border py-8 first:border-t-0 first:pt-0">
       <div className="grid gap-3 sm:grid-cols-[48px_minmax(0,1fr)]">
         <span className="font-brand text-xs text-muted-foreground">{String(index).padStart(2, "0")}</span>
         <div className="min-w-0"><h2 className="mb-5 font-zh text-xl font-normal">{title}</h2>{children}</div>
