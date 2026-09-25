@@ -22,10 +22,15 @@ export async function signInAction(
   _previous: FormActionState,
   formData: FormData,
 ): Promise<FormActionState> {
+  // Sanitize the navigation hint before the shared parse so a tampered or
+  // unknown `intent` can never fail the credential schema and mask a correct
+  // e-mail/password as "wrong credentials". Matches the page-level sanitizing
+  // in `sign-in/page.tsx` and `onboarding/page.tsx`.
+  const rawIntent = formData.get("intent");
   const input = signInSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
-    intent: formData.get("intent") || undefined,
+    intent: rawIntent === "requester" || rawIntent === "builder" ? rawIntent : undefined,
   });
   if (!input.success) {
     return { errorCode: "INVALID_CREDENTIALS", message: "邮箱或密码不正确。" };
