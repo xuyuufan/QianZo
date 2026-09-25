@@ -80,22 +80,43 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
   // move through the App Router's own client history. While there are unsaved
   // edits, tag the *current* history entry with replaceState — never pushState,
   // which would truncate the forward stack and break Forward for anyone who
-  // reached the editor with the Back button — and intercept popstate: landing
-  // on the tagged editor entry means Forward returned into the editor and is
-  // left alone, while landing anywhere else is a Back out of the editor and is
-  // confirmed. Cancelling sends the user forward again, which also never
-  // truncates anything.
+  // reached the editor with the Back button — and intercept popstate: landing on
+  // the tagged editor entry is a traversal back into the editor and is left
+  // alone, while landing anywhere else left the editor and is confirmed.
+  // Cancelling then has to restore the editor, and History reports no direction
+  // for the traversal that fired popstate, so the restore steps forward first
+  // and falls back to stepping back (see the handler for the exact rule).
   useEffect(() => {
     if (!unsaved) return;
     const guardState = { ...window.history.state, qianzoSpecEditorGuard: true };
     window.history.replaceState(guardState, "", window.location.href);
+    let disposed = false;
+    // History reports no direction for the traversal that fired popstate, so an
+    // untagged landing is either a Back away from the editor (the editor entry is
+    // ahead of us, and one step forward restores it) or a Forward away from it
+    // (the editor entry is behind us, and one step forward is a silent no-op).
+    // Step forward once; if that did not reach the editor, undo that step and go
+    // back instead. Either way the user ends up on the editor entry.
     const guardHistory = () => {
       if (window.history.state?.qianzoSpecEditorGuard) return;
       if (window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) return;
+      let reachedEditor = false;
+      let steppedForward = false;
+      const noteStep = () => {
+        if (window.history.state?.qianzoSpecEditorGuard) reachedEditor = true;
+        else steppedForward = true;
+      };
+      window.addEventListener("popstate", noteStep);
       window.history.forward();
+      window.setTimeout(() => {
+        window.removeEventListener("popstate", noteStep);
+        if (disposed || reachedEditor) return;
+        window.history.go(steppedForward ? -2 : -1);
+      }, 80);
     };
     window.addEventListener("popstate", guardHistory);
     return () => {
+      disposed = true;
       window.removeEventListener("popstate", guardHistory);
       // Clear the tag once the edits are saved or abandoned. replaceState keeps
       // the current entry in place, so nothing jumps and no entries pile up.
