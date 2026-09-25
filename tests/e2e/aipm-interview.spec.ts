@@ -27,6 +27,8 @@ const adminSql = postgres(
   { max: 1, prepare: false },
 );
 let demoUserIds: string[] = [];
+const builderOnlyEmail = `spec-builder-${Date.now()}@qianzo.test`;
+let builderOnlyUserId: string;
 
 test.beforeAll(async () => {
   const { data, error } = await authAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -39,11 +41,26 @@ test.beforeAll(async () => {
   demoUserIds = data.users.filter((user) => user.email && emails.has(user.email)).map((user) => user.id);
   if (demoUserIds.length !== 3) throw new Error("Run pnpm demo:seed before the interview E2E test.");
   await clearDemoBusinessData(adminSql, demoUserIds);
+  const { data: builderUser, error: createError } = await authAdmin.auth.admin.createUser({
+    email: builderOnlyEmail,
+    password: tools.DEMO_USER_PASSWORD,
+    email_confirm: true,
+  });
+  if (createError) throw createError;
+  builderOnlyUserId = builderUser.user.id;
+  await adminSql`insert into app.users (id, display_name) values (${builderOnlyUserId}, 'Spec 测试 Builder')`;
+  await adminSql`insert into app.user_roles (user_id, role) values (${builderOnlyUserId}, 'BUILDER')`;
 });
 
 test.afterAll(async () => {
   if (demoUserIds.length) {
     await clearDemoBusinessData(adminSql, demoUserIds);
+  }
+  if (builderOnlyUserId) {
+    await adminSql`delete from app.user_roles where user_id = ${builderOnlyUserId}`;
+    await adminSql`delete from app.users where id = ${builderOnlyUserId}`;
+    const { error } = await authAdmin.auth.admin.deleteUser(builderOnlyUserId);
+    if (error) throw error;
   }
   await adminSql.end();
 });
@@ -62,6 +79,7 @@ test("a draft becomes a published recruitment project end to end", async ({
   await page.getByRole("button", { name: "创建草稿" }).click();
   await expect(page).toHaveURL(/\/enterprise\/projects\/[0-9a-f-]{36}$/, { timeout: 15_000 });
   const projectPath = new URL(page.url()).pathname;
+  const projectId = projectPath.split("/").pop() ?? "";
 
   await page.getByRole("link", { name: "需求访谈与 Spec" }).click();
   await expect(page).toHaveURL(new RegExp(`${projectPath.replaceAll("/", "\\/")}/spec$`));
@@ -84,23 +102,102 @@ test("a draft becomes a published recruitment project end to end", async ({
   await page.getByRole("button", { name: "生成候选 Spec" }).click();
   await expect(page.getByText("候选 Spec 已生成，可在下方预览。")).toBeVisible();
   await expect(page.getByRole("heading", { name: "最新候选 Spec" })).toBeVisible();
-  await expect(page.getByText("里程碑与验收")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "里程碑与验收" })).toBeVisible();
   await expect(page.getByText("第 14 个自然日")).toBeVisible();
 
+  // A new candidate must not overwrite a manual edit already in progress.
+  const editor = page.getByTestId("structured-spec-editor");
+  await expect(editor.locator(".spec-editor-section")).toHaveCount(11);
+  await editor.getByLabel("项目目标").fill("保留的未保存目标：先确认访谈内容，再确认交付范围。");
+  await page
+    .getByLabel("访谈回复")
+    .fill("请明确企业负责人和交付方的职责，并按里程碑逐项验证验收标准。");
+  await page.getByRole("button", { name: "生成候选 Spec" }).click();
+  await expect(page.locator('li[data-role="USER"]')).toHaveCount(3);
+  await expect(page.locator('li[data-role="ASSISTANT"]')).toHaveCount(3);
+  await expect(page.getByText("候选 Spec 已生成，可在下方预览。")).toBeVisible();
+  await expect(editor.getByLabel("项目目标")).toHaveValue(
+    "保留的未保存目标：先确认访谈内容，再确认交付范围。",
+  );
+  await expect(editor.locator(".editor-save-state")).toContainText("有未保存修改");
+  const secondCandidateGoal = await page
+    .locator(".spec-candidate-panel .spec-section")
+    .filter({ has: page.getByRole("heading", { name: "项目目标" }) })
+    .locator("p")
+    .first()
+    .innerText();
+
   // Adopt the candidate into the first immutable version.
+  const [databaseProject] = await adminSql`select version from app.projects where id = ${projectId}`;
+  const adoptionVersion = page.locator(
+    '.spec-candidate-panel form input[name="expectedVersion"]',
+  );
+  await expect(adoptionVersion).toHaveValue(String(databaseProject.version));
   await page.getByRole("button", { name: "采用为当前 Spec 版本" }).click();
   await expect(page.getByText("该候选已采用为版本 1，历史版本不会被覆盖。")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Spec 版本 1（当前）" })).toBeVisible();
   await expect(page.getByText("当前 Spec 版本 1")).toBeVisible();
 
   // A manual save always appends: the earlier version stays readable.
-  const editor = page.getByLabel("Spec 文档（JSON）");
-  await expect(editor).toHaveValue(/我们希望把模糊需求整理成可招募的确认范围/);
-  const editedContent = (await editor.inputValue()).replace(
-    "我们希望把模糊需求",
-    "手工编辑后：我们希望把模糊需求",
+  await expect(editor.getByLabel("项目目标")).toHaveValue(
+    "保留的未保存目标：先确认访谈内容，再确认交付范围。",
   );
-  await editor.fill(editedContent);
+
+  // New IDs remain stable as rows move or fields change. Linked entries must
+  // first be unlinked before they can be removed.
+  await editor.getByRole("button", { name: "＋ 添加功能" }).click();
+  const featureCards = editor.locator("#edit-features .spec-edit-card");
+  const newFeatureCard = featureCards.last();
+  const newFeatureId = (await newFeatureCard.locator("code").innerText()).trim();
+  await newFeatureCard.getByLabel("功能名称").fill("E2E 引用校验功能");
+  await newFeatureCard.getByRole("button", { name: `上移 ${newFeatureId}` }).click();
+  await expect(featureCards.first().locator("code")).toHaveText(newFeatureId);
+
+  await editor.getByRole("button", { name: "＋ 添加页面" }).click();
+  const pageCard = editor.locator("#edit-pages .spec-edit-card").last();
+  const featureChoice = pageCard.getByRole("checkbox", {
+    name: `E2E 引用校验功能 · ${newFeatureId}`,
+  });
+  await featureChoice.check();
+  const deleteFeature = editor.getByRole("button", { name: `删除 ${newFeatureId}` });
+  await expect(deleteFeature).toBeDisabled();
+  await featureChoice.uncheck();
+  await expect(deleteFeature).toBeEnabled();
+  await deleteFeature.click();
+  const pageId = (await pageCard.locator("code").innerText()).trim();
+  await editor.getByRole("button", { name: `删除 ${pageId}` }).click();
+
+  // The shared cumulative-day validator reports the specific milestone field.
+  await editor.getByRole("button", { name: "＋ 添加里程碑" }).click();
+  const milestoneCards = editor.locator("#edit-milestones .milestone-edit-card");
+  const newMilestone = milestoneCards.last();
+  const milestoneId = (await newMilestone.locator("code").first().innerText()).trim();
+  const previousDays = Number(
+    await milestoneCards
+      .nth((await milestoneCards.count()) - 2)
+      .getByRole("spinbutton")
+      .inputValue(),
+  );
+  const newMilestoneDays = newMilestone.getByRole("spinbutton");
+  await newMilestoneDays.fill(String(previousDays));
+  await expect(newMilestoneDays).toHaveAttribute("aria-invalid", "true");
+  await expect(newMilestone.getByText(/严格递增/)).toBeVisible();
+  await expect(editor.getByRole("button", { name: "保存为新版本" })).toBeDisabled();
+  await newMilestoneDays.fill(String(previousDays + 1));
+  await expect(newMilestoneDays).toHaveAttribute("aria-invalid", "false");
+  await editor.getByRole("button", { name: `删除 ${milestoneId}` }).click();
+
+  await expect(editor.getByLabel("验收标准").first()).toBeVisible();
+  await editor
+    .getByLabel("验证方法")
+    .first()
+    .fill("E2E：逐条核对现场操作结果与验收清单。");
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("Spec 还有未保存修改");
+    await dialog.dismiss();
+  });
+  await page.getByRole("link", { name: "← 返回项目总览" }).click();
+  await expect(page).toHaveURL(new RegExp(`${projectPath.replaceAll("/", "\\/")}/spec$`));
   await page.getByRole("button", { name: "保存为新版本" }).click();
   await expect(page.getByText("已保存为版本 2。")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Spec 版本 2（当前）" })).toBeVisible();
@@ -112,10 +209,8 @@ test("a draft becomes a published recruitment project end to end", async ({
   await expect(reviewedVersion.getByText("这是历史版本，不会被修改")).toBeVisible();
   // The first version still holds what was adopted, not the later edit; the
   // editor below it always starts from the current version.
-  await expect(reviewedVersion.getByText("手工编辑后：")).toHaveCount(0);
-  await expect(
-    reviewedVersion.getByText("我们希望把模糊需求整理成可招募的确认范围，并按里程碑逐条验收。"),
-  ).toHaveCount(1);
+  await expect(reviewedVersion.getByText("保留的未保存目标：")).toHaveCount(0);
+  await expect(reviewedVersion.getByText(secondCandidateGoal)).toHaveCount(1);
 
   // Reference budget lives on the project overview and is saved exactly.
   await page.getByRole("link", { name: "← 返回项目总览" }).click();
@@ -193,12 +288,11 @@ test("a draft becomes a published recruitment project end to end", async ({
 
   const builderContext = await browser.newContext({ baseURL: "http://127.0.0.1:3000" });
   const builderPage = await builderContext.newPage();
-  await loginDemoUser(builderPage, "builder@qianzo.local", password);
+  await loginDemoUser(builderPage, builderOnlyEmail, password);
   await builderPage.goto(specPath);
-  await expect(builderPage).toHaveURL(/\/$/);
+  await expect(builderPage).toHaveURL(/\/projects$/);
 
   // The published project shows up in the recruitment view, masked.
-  const projectId = projectPath.split("/").pop() ?? "";
   await builderPage.goto("/projects");
   await expect(builderPage.getByRole("link", { name: /E2E 招募项目（脱敏）/ })).toBeVisible();
   const recruitmentResponse = await builderPage.goto(`/projects/${projectId}`);
