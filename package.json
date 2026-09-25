@@ -23,8 +23,11 @@
     "demo:seed": "tsx scripts/demo-seed.ts"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "1.2.4",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.116.0",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
     "drizzle-orm": "0.45.3",
     "lucide-react": "0.575.0",
     "next": "16.3.5",
@@ -32,6 +35,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "0.0.1",
+    "tailwind-merge": "3.5.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

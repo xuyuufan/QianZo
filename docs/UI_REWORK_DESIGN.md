@@ -16,7 +16,7 @@
 | 浅色机械海报 | 下载源码 src/assets/qianzo-mechanical-light-poster.webp；复制到 public/assets/qianzo-mechanical-light-poster.webp，字节校验一致 | c7945852cd36f1bcf57bfaaa14828a7f88bfba02e9dd9f003e020d9095aa4230 |
 | 深色机械海报 | 保留在只读设计源中；原版首页固定使用浅色版本 | 0fb2d22fda2c5dc132918ab2f8f5d942879b04efbbe849438735d8399918c864 |
 | 浅色首页视频 | 下载目录只有 .asset.json 描述文件；按描述文件中的 Lovable 地址核验为 HTTP 200、video/mp4、7,819,004 字节，已存入 public/assets/qianzo-mechanical-light.mp4 | b2ee530763100e8677e7db87eb4f66a1e0e2b7b66d774238a6b948ffd9d3b888 |
-| 字体 | 原版 root 从 Google Fonts 加载 IBM Plex Sans 与 Noto Sans SC，源码没有附带字体文件。接入版将以本地文件提供这两种字体及 300/400/500 字重，减少外部加载差异 | 待任务 2 完成 |
+| 字体 | 原版 root 从 Google Fonts 加载 IBM Plex Sans 与 Noto Sans SC，源码没有附带字体文件。接入版将以本地文件提供这两种字体及 300/400/500 字重，减少外部加载差异 | `public/fonts/`；字体及许可证的 SHA-256 见 [integrated-fonts.sha256](ui-reference/integrated-fonts.sha256) |
 
 ## 2. 原版页面与 Next.js 路由映射
 
@@ -47,7 +47,7 @@
 | 任务 | 状态 |
 |---|---|
 | 1. 来源冻结、页面映射、隔离原版环境与三视口基准截图 | 已完成：115 个文件哈希已记录；21 张基准截图采集成功；浅色视频资源可取得 |
-| 2. 原版视觉基础、字体和实际使用的组件 | 待实施 |
+| 2. 原版视觉基础、字体和实际使用的组件 | 已完成：迁入 OKLCH tokens、纸张/网格/动效样式、Button 组件与本地字体；typecheck、lint、91 项单元测试通过 |
 | 3. 首页、真实登录和公共导航 | 待实施 |
 | 4. 我的项目、大厅与真实项目详情 | 待实施 |
 | 5. 需求工作台、访谈和详情标签结构 | 待实施 |
