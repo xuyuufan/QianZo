@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { emptySpecActionState } from "@/app/actions/spec-state";
 import { saveSpecVersionAction } from "@/app/actions/specs";
@@ -13,6 +13,12 @@ import {
 import { describeFieldIssues } from "@/platform/validation";
 
 import { syncEditorWithServer } from "./editor-sync";
+import {
+  clearSpecDraft,
+  readSpecDraft,
+  specDraftStorageKey,
+  writeSpecDraft,
+} from "./spec-draft";
 import {
   createStableSpecId,
   moveSpecItem,
@@ -37,6 +43,29 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
   // Fingerprint of the last submitted content, so the server's field messages
   // are only shown while they still describe the draft on screen.
   const [submittedContent, setSubmittedContent] = useState<string | null>(null);
+  const draftKey = specDraftStorageKey(projectId);
+  const draftChecked = useRef(false);
+  // A traversal can unmount this editor before the confirmation runs, so a draft
+  // that went away unsaved is adopted back here. It has to happen after
+  // hydration — the server knows nothing about local storage, so doing it during
+  // the first render would make the hydrated markup disagree — and the ref keeps
+  // it a one-shot adoption, so it cannot cascade into repeated renders, which is
+  // the failure the rule below exists to prevent.
+  useEffect(() => {
+    if (draftChecked.current) return;
+    draftChecked.current = true;
+    const stored = readSpecDraft(window.sessionStorage, draftKey, initialContent);
+    if (!stored) return;
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot post-hydration adoption of a locally recoverable draft
+      setEditorDraft({
+        document: JSON.parse(stored.content) as SpecDocumentV1,
+        syncedContent: initialContent,
+      });
+    } catch {
+      clearSpecDraft(window.sessionStorage, draftKey);
+    }
+  }, [draftKey, initialContent]);
   const serverSync = syncEditorWithServer({
     initialContent,
     content: JSON.stringify(editorDraft.document, null, 2),
@@ -48,6 +77,16 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
   const syncedContent = serverSync?.syncedContent ?? editorDraft.syncedContent;
   const content = useMemo(() => JSON.stringify(document, null, 2), [document]);
   const unsaved = content !== syncedContent;
+
+  // Mirror the draft while it is dirty and drop it once it is not, which covers
+  // a successful save, a discarded draft and the editor simply being clean.
+  useEffect(() => {
+    if (unsaved) {
+      writeSpecDraft(window.sessionStorage, draftKey, { content, serverContent: syncedContent });
+    } else {
+      clearSpecDraft(window.sessionStorage, draftKey);
+    }
+  }, [content, syncedContent, unsaved, draftKey]);
 
   useEffect(() => {
     onDirtyChange?.(unsaved);
@@ -63,10 +102,12 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
       if (!unsaved || !(event.target instanceof Element)) return;
       const link = event.target.closest<HTMLAnchorElement>("a[href]");
       if (!link || link.pathname === window.location.pathname && link.search === window.location.search) return;
-      if (!window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) {
-        event.preventDefault();
-        event.stopPropagation();
+      if (window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) {
+        clearSpecDraft(window.sessionStorage, draftKey);
+        return;
       }
+      event.preventDefault();
+      event.stopPropagation();
     };
     window.addEventListener("beforeunload", warnBeforeUnload);
     window.addEventListener("click", confirmNavigation, true);
@@ -74,18 +115,20 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
       window.removeEventListener("beforeunload", warnBeforeUnload);
       window.removeEventListener("click", confirmNavigation, true);
     };
-  }, [unsaved]);
+  }, [unsaved, draftKey]);
 
   // The click guard above cannot see the browser's Back/Forward buttons, which
   // move through the App Router's own client history. While there are unsaved
   // edits, tag the *current* history entry with replaceState — never pushState,
-  // which would truncate the forward stack and break Forward for anyone who
-  // reached the editor with the Back button — and intercept popstate: landing on
+  // which would truncate the forward stack — and intercept popstate: landing on
   // the tagged editor entry is a traversal back into the editor and is left
   // alone, while landing anywhere else left the editor and is confirmed.
-  // Cancelling then has to restore the editor, and History reports no direction
-  // for the traversal that fired popstate, so the restore steps forward first
-  // and falls back to stepping back (see the handler for the exact rule).
+  //
+  // Interception is best effort, not the guarantee. A browser history change is
+  // committed by the App Router before this handler is reached, so a Forward
+  // departure can unmount the editor without the confirmation ever running.
+  // The draft mirror in `spec-draft.ts` is what makes cancelling safe: the work
+  // is offered back the next time the editor opens, whichever traversal won.
   useEffect(() => {
     if (!unsaved) return;
     const guardState = { ...window.history.state, qianzoSpecEditorGuard: true };
@@ -99,7 +142,10 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
     // back instead. Either way the user ends up on the editor entry.
     const guardHistory = () => {
       if (window.history.state?.qianzoSpecEditorGuard) return;
-      if (window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) return;
+      if (window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) {
+        clearSpecDraft(window.sessionStorage, draftKey);
+        return;
+      }
       let reachedEditor = false;
       let steppedForward = false;
       const noteStep = () => {
@@ -128,7 +174,7 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
         );
       }
     };
-  }, [unsaved]);
+  }, [unsaved, draftKey]);
 
   const validation = useMemo(() => {
     const parsed = specDocumentSchema.safeParse(document);

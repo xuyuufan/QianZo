@@ -8,6 +8,7 @@ import type { SpecDocumentV1 } from "@/modules/specs/document";
 
 import { AdoptCandidateForm } from "./adopt-candidate-form";
 import { LockSpecForm } from "./lock-spec-form";
+import { clearSpecDraft, specDraftStorageKey } from "./spec-draft";
 import { SpecEditorForm } from "./spec-editor-form";
 
 type SpecVersionView = {
@@ -319,7 +320,12 @@ export function SpecReviewWorkspace({
                 <button type="button" className="font-zh text-xs underline decoration-border underline-offset-4" onClick={() => setActivePanel("edit")}>
                   返回编辑 Spec
                 </button>
-                <button type="button" className="font-zh text-xs text-muted-foreground underline decoration-border underline-offset-4" onClick={() => window.location.reload()}>
+                <button type="button" className="font-zh text-xs text-muted-foreground underline decoration-border underline-offset-4" onClick={() => {
+                  // The draft the editor mirrors is recoverable on purpose, so
+                  // discarding has to drop it first or the reload restores it.
+                  clearSpecDraft(window.sessionStorage, specDraftStorageKey(projectId));
+                  window.location.reload();
+                }}>
                   放弃修改并重新加载
                 </button>
               </div>
