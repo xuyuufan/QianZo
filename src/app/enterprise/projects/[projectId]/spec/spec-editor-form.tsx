@@ -15,6 +15,8 @@ import { describeFieldIssues } from "@/platform/validation";
 import { syncEditorWithServer } from "./editor-sync";
 import {
   clearSpecDraft,
+  clearSpecDraftFor,
+  openSpecDraftStorage,
   readSpecDraft,
   specDraftStorageKey,
   writeSpecDraft,
@@ -54,7 +56,9 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
   useEffect(() => {
     if (draftChecked.current) return;
     draftChecked.current = true;
-    const stored = readSpecDraft(window.sessionStorage, draftKey, initialContent);
+    const storage = openSpecDraftStorage();
+    if (!storage) return;
+    const stored = readSpecDraft(storage, draftKey, initialContent);
     if (!stored) return;
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot post-hydration adoption of a locally recoverable draft
@@ -63,9 +67,9 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
         syncedContent: initialContent,
       });
     } catch {
-      clearSpecDraft(window.sessionStorage, draftKey);
+      clearSpecDraftFor(projectId);
     }
-  }, [draftKey, initialContent]);
+  }, [draftKey, initialContent, projectId]);
   const serverSync = syncEditorWithServer({
     initialContent,
     content: JSON.stringify(editorDraft.document, null, 2),
@@ -81,10 +85,12 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
   // Mirror the draft while it is dirty and drop it once it is not, which covers
   // a successful save, a discarded draft and the editor simply being clean.
   useEffect(() => {
+    const storage = openSpecDraftStorage();
+    if (!storage) return;
     if (unsaved) {
-      writeSpecDraft(window.sessionStorage, draftKey, { content, serverContent: syncedContent });
+      writeSpecDraft(storage, draftKey, { content, serverContent: syncedContent });
     } else {
-      clearSpecDraft(window.sessionStorage, draftKey);
+      clearSpecDraft(storage, draftKey);
     }
   }, [content, syncedContent, unsaved, draftKey]);
 
@@ -103,7 +109,7 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
       const link = event.target.closest<HTMLAnchorElement>("a[href]");
       if (!link || link.pathname === window.location.pathname && link.search === window.location.search) return;
       if (window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) {
-        clearSpecDraft(window.sessionStorage, draftKey);
+        clearSpecDraftFor(projectId);
         return;
       }
       event.preventDefault();
@@ -115,7 +121,7 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
       window.removeEventListener("beforeunload", warnBeforeUnload);
       window.removeEventListener("click", confirmNavigation, true);
     };
-  }, [unsaved, draftKey]);
+  }, [unsaved, projectId]);
 
   // The click guard above cannot see the browser's Back/Forward buttons, which
   // move through the App Router's own client history. While there are unsaved
@@ -143,7 +149,7 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
     const guardHistory = () => {
       if (window.history.state?.qianzoSpecEditorGuard) return;
       if (window.confirm("Spec 还有未保存修改。确定离开并放弃这些修改吗？")) {
-        clearSpecDraft(window.sessionStorage, draftKey);
+        clearSpecDraftFor(projectId);
         return;
       }
       let reachedEditor = false;
@@ -174,7 +180,7 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
         );
       }
     };
-  }, [unsaved, draftKey]);
+  }, [unsaved, projectId]);
 
   const validation = useMemo(() => {
     const parsed = specDocumentSchema.safeParse(document);

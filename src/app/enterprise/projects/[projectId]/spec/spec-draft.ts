@@ -27,6 +27,27 @@ export function specDraftStorageKey(projectId: string): string {
 }
 
 /**
+ * The browser's session storage, or null when it cannot be reached. Some
+ * browsers throw on the property access itself — not just on the methods — when
+ * storage is disabled, so even taking the handle has to be guarded.
+ */
+export function openSpecDraftStorage(): DraftStorage | null {
+  try {
+    return typeof window === "undefined" ? null : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** Drops the draft for a project, wherever storage is reachable. */
+export function clearSpecDraftFor(projectId: string): void {
+  const storage = openSpecDraftStorage();
+  if (storage) {
+    clearSpecDraft(storage, specDraftStorageKey(projectId));
+  }
+}
+
+/**
  * The draft to reopen, or null when the editor should start from the server
  * value. A draft is only honoured while the server still serves the version it
  * was written against, so a stale draft can never shadow newer saved work.
