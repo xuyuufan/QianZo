@@ -174,7 +174,7 @@ S1-06 的验收与文档提交见 `eb38dc6`。
 - `corepack pnpm build`：通过，11 条 App Router 路由（`/`、`/_not-found`、`/enterprise/projects`、`/enterprise/projects/[projectId]`、`/enterprise/projects/[projectId]/publish`、`/enterprise/projects/[projectId]/spec`、`/enterprise/projects/new`、`/onboarding`、`/projects`、`/projects/[projectId]`、`/sign-in`）。
 - `corepack pnpm start` + `corepack pnpm test:e2e`：**11 个真实浏览器用例全部通过**（约 1.8 分钟），`/sign-in` 返回 200。E2E 运行在**生产构建与生产服务**上，覆盖完整 S0→S1 主链路（创建草稿 → 两轮访谈 → 生成候选 → 采用 → 手工另存 → 锁定 → 定金 → 文字脱敏 → 发布 → 招募浏览）、登录意图与 onboarding、越权拒绝、响应隐私与桌面/平板/手机布局。用例分布：`aipm-interview` 1、`home` 5、`identity` 4、`projects` 1。截图仍只落在 Git 忽略的 `test-results/`。
 - **独立复核（另一执行者，非本轮实现者）**：独立复跑 `typecheck`、`lint`、`test`（10/91）、`test:integration`（9/115），结论一致；对 E2E 断言逐条比对**未发现变松或换语义**（全文无 `waitForTimeout` / `force: true` / `skip` / `only`），隐私类断言（响应体不含原始需求、访谈正文、企业邮箱与 `ZZSECRET` 标记）**原样保留**；`tests/helpers/ui-visual-fixtures.ts` 的合成夹具仅用于版式截屏与列表计数，主链路仍由 UI 驱动真实 Server Action，夹具行由既有 `clearDemoBusinessData`（含 `spec_versions`）清理，无残留污染。
-- **已知测试缺口（本轮未补，非回归）**：`?version=` 深链非法输入的页面级断言、`publishProjectAction` 的 action 级错误映射、招募详情渲染 HTML 对企业 `displayName` 的直接负向断言。三者当前分别由仓储归属校验、代码路径审查与白名单/DTO 精确断言间接保证。
+- **已知测试缺口（本轮未补，非回归）**：`?version=` 深链非法输入的页面级断言、`publishProjectAction` 的 action 级错误映射、招募详情渲染 HTML 对企业 `displayName` 的直接负向断言。三者当前分别由仓储归属校验、代码路径审查与白名单/DTO 精确断言间接保证。此外**浏览器前进/后退守卫没有任何自动化覆盖**——本轮修复是靠独立复核的真实浏览器探针验证的，建议后续补「编辑 → 前进/后退 → 取消/确认」两类用例把该行为锁住。
 
 ### PR #3 复审修复（2026-09-26）
 
@@ -219,6 +219,7 @@ codex 的 code review 配额用尽后（`@codex review` 只会回一条 usage li
 - 用户**确认放弃**的两个入口（点击链接离开、popstate 确认）以及「放弃修改并重新加载」按钮都会显式清除草稿——否则刷新会把已放弃的稿子带回来。
 - 原有历史守卫保留并**如实标注为 best effort**（后退方向实测有效），但正确性不再依赖它。
 - 补上复核指出的覆盖缺口：新增 `tests/unit/spec-draft.test.ts` 6 例（键作用域、同版本往返、跨版本忽略、缺失/非法/非对象载荷、清除、storage 抛错不冒泡）。
+- 复核另指出一处真实风险：部分浏览器在存储被禁用时，`window.sessionStorage` 的**属性访问本身**就会抛错，而原实现只把方法调用包在 try/catch 里。现统一经由 `openSpecDraftStorage()` 安全取句柄，清理走 `clearSpecDraftFor(projectId)`。
 
 复核**未能证伪**的两项就此确认：`?version=` 写回地址栏（两个 `replaceState` 都做 `{...window.history.state}` 合并，实测守卫标记与草稿在切换版本后并存、随后后退仍会确认）；reduced-motion 视频跳过（服务端 HTML 里 mp4 出现 **0** 次、海报 1 次，复合查询两部分变化都能触发）。
 
