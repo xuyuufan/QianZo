@@ -1,6 +1,6 @@
 # Qianzo 项目状态
 
-更新时间：2026-10-02（PR 就绪复核通过；Lovable UI 与 S1 的实现及历史验收记录保留在下文）
+更新时间：2026-10-02（Codex 最新评审修复与回归完成；PR #3 的 16 条评审线程均已解决）
 
 当前分支：`feat/lovable-ui-parity`（基于 `feat/s1-spec-publish` 的 `736c42c`；已推送，对应开放的 [PR #3](https://github.com/xuyuufan/QianZo/pull/3)）。
 
@@ -9,6 +9,24 @@
 当前 Slice：S1「需求变成可招募项目」已完成本地实现、升级与空库重建验证；本轮为 UI 对齐，不新增 Slice；S2 未开始。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
+
+## Codex 最新评审修复（2026-10-02）
+
+针对 `e68b0d9` 上新增的 3 条 P2，逐条复现后完成修复；代码与回归用例提交为 `68b5193`，已推送到 PR #3。
+
+| 评审问题 | 最终处理与浏览器证据 |
+|---|---|
+| [隐藏首页视频后仍下载/播放](https://github.com/xuyuufan/QianZo/pull/3#discussion_r4163281103) | 媒体查询不匹配时显式 `pause()`，移除 source 后 `load()` 释放所选资源；重新匹配时重新选择资源，区分旧加载事件与真实错误，保留加载失败时的海报回退。回归覆盖桌面播放 → 手机暂停且无媒体缓冲 → 桌面重新播放 → reduced-motion 再次释放。 |
+| [版本冲突时确认放弃仍恢复旧草稿](https://github.com/xuyuufan/QianZo/pull/3#discussion_r4163281109) | 在确认后的 reload 前调用 `clearSpecDraftFor(projectId)`。独立合成账号的回归先验证刷新恢复，再通过另一标签页真实保存预算制造版本冲突；取消放弃保留草稿，确认放弃清除草稿并恢复服务端 Spec。 |
+| [采用新 Spec 后复用旧锁定确认](https://github.com/xuyuufan/QianZo/pull/3#discussion_r4163281113) | 以 `current.id + projectVersion` 为 `LockSpecForm` 的 key；Spec 或项目修订变化时重建确认状态。回归覆盖确认 v1 → 采用候选 v2 → 复选框未选、锁定按钮禁用、数据库仍未锁定 → 重新确认后只锁当前 v2。 |
+
+新增用例先对修复前的生产构建执行，分别证实仍在播放、已放弃草稿仍存在、旧确认仍勾选；随后对最终新构建回归通过。新增 Spec 测试只建立测试起始状态，操作走真实登录与 Server Actions，清理仅针对本套件独立创建的合成账号；本地项目数测试前后均为 0，没有运行 `db:reset`。
+
+本次最终验证：`corepack pnpm typecheck`、`lint` 通过；单元 **11 文件 / 99 例**，集成 **9 文件 / 115 例**，生产构建 **11 条路由**，生产服务上的完整 E2E **14 例全部通过（约 1.2 分钟）**；`git diff --check` 通过。
+
+远端已逐条核对并解决 PR #3 的 **16 条线程（13 条历史 + 3 条本轮），未解决数为 0**。历史意见的最终处理以对应修复源码及下文复核记录为准，特别是历史离开守卫采用已有的草稿恢复方案。刷新恢复与取消/确认放弃已有本轮 E2E 覆盖；直接浏览器 Back/Forward 的拦截仍为 best effort、尚无自动化断言，存储不可用时也不能保证恢复。
+
+最新自动评审针对修复前的 `e68b0d9`；解决线程不等于新提交获得 APPROVED review。PR #3 仍为 OPEN，依赖 PR #2；本轮未执行 merge，S2/S3、真实 AI/支付和生产部署继续保持未实施。
 
 ## PR 就绪复核（2026-10-02）
 
