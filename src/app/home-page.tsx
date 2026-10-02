@@ -37,23 +37,31 @@ export function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (!showVideo) return;
     const video = videoRef.current;
     if (!video) return;
+    if (!showVideo) {
+      // Removing <source> alone leaves an already selected resource playing.
+      // React has removed the source before this effect, so load() releases it.
+      video.pause();
+      if (video.currentSrc) video.load();
+      return;
+    }
+    video.style.removeProperty("display");
     const source = video.querySelector("source");
     const hideFailedVideo = () => {
       video.style.display = "none";
     };
-    video.addEventListener("error", hideFailedVideo);
-    video.addEventListener("abort", hideFailedVideo);
+    const hideMediaError = () => {
+      if (video.error) hideFailedVideo();
+    };
+    video.addEventListener("error", hideMediaError);
     source?.addEventListener("error", hideFailedVideo);
-    source?.addEventListener("abort", hideFailedVideo);
-    if (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) hideFailedVideo();
+    // Register failure listeners before selecting the resource again. Resetting
+    // a previous selection can queue events that are not errors in this one.
+    video.load();
     return () => {
-      video.removeEventListener("error", hideFailedVideo);
-      video.removeEventListener("abort", hideFailedVideo);
+      video.removeEventListener("error", hideMediaError);
       source?.removeEventListener("error", hideFailedVideo);
-      source?.removeEventListener("abort", hideFailedVideo);
     };
   }, [showVideo]);
 

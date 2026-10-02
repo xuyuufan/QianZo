@@ -332,6 +332,7 @@ export function SpecReviewWorkspace({
             </div>
           ) : (
             <LockSpecForm
+              key={`${current.id}:${projectVersion}`}
               projectId={projectId}
               version={projectVersion}
               specVersionId={current.id}

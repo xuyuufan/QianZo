@@ -408,7 +408,12 @@ export function SpecEditorForm({ projectId, version, initialContent, onDirtyChan
         </div>
       ) : <p className="form-message success" role="status">结构校验通过。保存会新增一个 Spec 版本，历史版本不会被覆盖。</p>}
       {state.message ? <p className="form-message error" role="alert" data-error-code={state.errorCode ?? undefined}>{state.message}</p> : null}
-      {state.errorCode === "VERSION_CONFLICT" ? <button type="button" className="text-button" onClick={() => { if (window.confirm("重新加载会放弃当前未保存的修改。确定继续吗？")) window.location.reload(); }}>放弃修改并重新加载</button> : null}
+      {state.errorCode === "VERSION_CONFLICT" ? <button type="button" className="text-button" onClick={() => {
+        if (window.confirm("重新加载会放弃当前未保存的修改。确定继续吗？")) {
+          clearSpecDraftFor(projectId);
+          window.location.reload();
+        }
+      }}>放弃修改并重新加载</button> : null}
       {state.successMessage ? <p className="form-message success" role="status">{state.successMessage}</p> : null}
       <div className="form-actions spec-editor-actions">
         <button className="button" type="submit" disabled={pending || !validation.success}>

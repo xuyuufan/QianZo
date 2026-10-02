@@ -64,6 +64,35 @@ test("home retains the poster when the local video cannot load", async ({ page }
   expect(posterLoaded).toBe(true);
 });
 
+test("home releases a playing video when the viewport or motion preference changes", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  const video = page.locator(".qianzo-film");
+  const playing = () => video.evaluate((element: HTMLVideoElement) =>
+    !element.paused && element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA,
+  );
+  const released = () => video.evaluate((element: HTMLVideoElement) => ({
+    paused: element.paused,
+    readyState: element.readyState,
+    buffered: element.buffered.length,
+  }));
+  await expect.poll(playing).toBe(true);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(video).toBeHidden();
+  await expect(video.locator("source")).toHaveCount(0);
+  await expect.poll(released).toEqual({ paused: true, readyState: 0, buffered: 0 });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(video).toBeVisible();
+  await expect.poll(playing).toBe(true);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(video).toBeHidden();
+  await expect(video.locator("source")).toHaveCount(0);
+  await expect.poll(released).toEqual({ paused: true, readyState: 0, buffered: 0 });
+});
+
 test("home role selection preserves keyboard access, transition and reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/assets/qianzo-mechanical-light.mp4", (route) => route.abort());
