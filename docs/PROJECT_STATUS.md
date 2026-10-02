@@ -1,14 +1,26 @@
 # Qianzo 项目状态
 
-更新时间：2026-09-26（Lovable UI 与后端对齐轮次完成本地实现与验收；S1 详细记录见下文，S0 历史见文末基线章节）
+更新时间：2026-10-02（PR 就绪复核通过；Lovable UI 与 S1 的实现及历史验收记录保留在下文）
 
-当前分支：`feat/lovable-ui-parity`（从 `feat/s1-spec-publish` 的 `736c42c` 建立，本地领先该基址 14 个提交，**尚未推送**）。
+当前分支：`feat/lovable-ui-parity`（基于 `feat/s1-spec-publish` 的 `736c42c`；已推送，对应开放的 [PR #3](https://github.com/xuyuufan/QianZo/pull/3)）。
 
-上游分支：`feat/s1-spec-publish`（`736c42c`）已推送并对应 PR #2，仍待合并。
+上游分支：`feat/s1-spec-publish`（`736c42c`）已推送并对应开放的 [PR #2](https://github.com/xuyuufan/QianZo/pull/2)，仍待合并。PR #3 当前以该分支为 base。
 
 当前 Slice：S1「需求变成可招募项目」已完成本地实现、升级与空库重建验证；本轮为 UI 对齐，不新增 Slice；S2 未开始。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
+
+## PR 就绪复核（2026-10-02）
+
+核查时应用代码基线为 `638aa72`，本地与远端 UI 分支一致，工作区干净；远端 PR #2 与 #3 均为 OPEN、非 Draft、MERGEABLE/CLEAN。现有 PR 已覆盖本轮交付，不重复创建。
+
+- **本次实际运行**：`corepack pnpm typecheck`、`lint` 通过；`test` 为 11 文件、99 例通过；`test:integration` 为 9 文件、115 例通过（含独立 scratch 库迁移链重建）；`build` 通过、11 条路由；新生产构建的 `start` + `test:e2e` 为 11 例通过（56.8 秒）。E2E 使用真实本地 Auth/PostgreSQL，覆盖 S0→S1 发布、招募脱敏与角色/企业隔离。
+- **本地环境**：启动 Docker Desktop 后复用原有健康的 Qianzo 容器；测试前已有 9 条 migration、3 个演示 Auth 账号、0 个项目，未执行 `db:reset`。根目录被忽略的旧 `.env` 含其他 `SUPABASE_PROJECT_ID`，导致第一次 `db:prepare` 查找错误的本地容器；在当前 shell 指定 `$env:SUPABASE_PROJECT_ID = 'qianzo'` 后重跑成功，无待应用迁移。根 README 已补充该设置，环境文件和凭据未纳入提交。
+- **独立静态复审**：核对草稿恢复、版本同步、锁定后禁写、脱敏确认、公开 DTO，以及 PR #3 的 13 条评审线程；现有源码或明确记录的取舍已处理这些意见，本次未发现新的实际阻塞问题。相对 S1 的 `git diff --check` 通过，业务模块、平台层与 migration 无改动，未发现新增凭据或生成垃圾。
+- **证据边界**：仓库没有 CI checks，也没有正式 APPROVED review；评审线程尚未形式上 resolved。浏览器前进/后退及返回编辑器恢复草稿仍无自动化断言，现有历史守卫与存储不可用时的恢复为 best effort，不能将上述 E2E 结果解释为这些路径已覆盖。
+- **远端交付**：本轮更新既有 PR #3 的说明与验证记录，不执行 merge。PR #2 应先合入 `main`，随后处理 PR #3 与合并后基线的衔接、重新核查 diff 和验证，再将 base 调整为 `main`；不能因当前 stacked diff 无冲突而省略这一步。
+
+本轮只补齐交付文档与 PR 记录；S2/S3、真实 AI、真实支付及生产部署继续保持未实施。
 
 ## S1 已完成
 

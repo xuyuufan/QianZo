@@ -19,12 +19,15 @@ Qianzo 当前完成了 S0 与 S1：企业通过真实 Supabase Auth 登录后可
 ```powershell
 cd D:\Qianzo
 $env:PATH = "D:\;$env:PATH"
+$env:SUPABASE_PROJECT_ID = 'qianzo'
 node -v          # 必须显示 v24.13.1，若仍是 v22.22.2 不要继续
 corepack pnpm -v # 显示 11.19.0
 ```
 
 之后把本文所有 `pnpm <script>` 写成 `corepack pnpm <script>`。希望直接敲 `pnpm` 时，可执行一次
 `corepack enable pnpm`（会在 Node 24 目录生成 shim）；也可把 `D:\` 固定加到用户 PATH 最前面。
+
+`SUPABASE_PROJECT_ID` 对应本仓库 `supabase/config.toml` 的本地项目名。显式设置可避免被忽略的旧 `.env` 中其他项目编号覆盖 CLI 的目标，导致 `db:start` / `db:prepare` 查找错误的本地容器；这项设置只作用于当前终端。
 
 ## 从 checkout 启动
 

@@ -1,6 +1,6 @@
 # Qianzo Flow UI 视觉还原与后端接入
 
-**状态：修复进行中。** 当前接入版没有忠实迁移 Lovable 页面；此前以 CSS 几何图形替代机械海报的决定撤销。UI 外观以本地下载源码为准，现有 Next.js/S0/S1 服务端流程继续作为业务事实来源。
+**状态：视觉还原与后端接入已完成，2026-10-02 PR 就绪复核通过。** UI 外观以本地下载源码为准，已恢复机械海报与视频；现有 Next.js/S0/S1 服务端流程继续作为业务事实来源。当前对应开放的 [PR #3](https://github.com/xuyuufan/QianZo/pull/3)，依赖尚未合并的 S1 PR #2；最新验证与限制见 [PROJECT_STATUS](PROJECT_STATUS.md)。
 
 ## 1. 设计源快照
 
@@ -54,7 +54,7 @@
 | 6. 访谈编辑器、完整 Spec 与发布流程 | 已完成：真实本地 Auth/PostgreSQL 闭环通过，含版本、锁定、Mock 定金、脱敏发布与招募读取 |
 | 7. 视觉、交互、业务、权限、移动端回归及交付记录 | 已完成：11 项 E2E、115 项集成测试及静态检查通过；桌面、平板、手机截图已采集 |
 
-本轮从集成分支 feat/lovable-ui-s0-s1 的 870ccb7 建立 codex/lovable-ui-parity。原有 docs/PROJECT_STATUS.md 与 next-env.d.ts 工作区改动必须原样保留，不能进入本轮 commit。默认只做本地 commit，不 push、PR、merge 或部署。
+2026-09-25 实施时从集成分支 feat/lovable-ui-s0-s1 的 870ccb7 建立 codex/lovable-ui-parity；当时保留原有 docs/PROJECT_STATUS.md 与 next-env.d.ts 工作区改动，只做本地 commit。后续交付分支为 feat/lovable-ui-parity，已推送并对应 PR #3；2026-10-02 本轮获授权检查并更新 PR，未执行 merge 或部署。
 
 任务 6 已迁入原版细线章节和双栏工作区：访谈候选、当前 Spec、只读历史、结构化编辑分视图切换；锁定前展示版本、标题、原始需求和预算并要求确认；发布页以步骤条、定金区和完整脱敏预览承载现有 S1 动作。招募详情继续只读取安全快照 DTO，验收标准与验证方式逐条展示。编辑器仍复用现有字段往返、稳定 ID、引用约束、周期校验、错误定位、版本冲突和未保存修改保护逻辑。
 
