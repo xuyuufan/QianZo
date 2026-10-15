@@ -118,7 +118,7 @@ Spec 版本分配在 Project 行锁内进行，最大版本号加一并以 UNIQU
 
 ### Contract 和 Mock
 
-复用总纲的 `AipmGateway.invoke(AipmRequest): Promise<AipmResponse>`、`INTERVIEW` / `GENERATE_SPEC` 与版本化 `POST /v1/invocations` 协议。S1 进程内使用 Mock，不必启动 HTTP 服务，也不需要真实模型 token。
+复用总纲的 `AipmGateway.invoke(AipmRequest): Promise<AipmResponse>`、`INTERVIEW` / `GENERATE_SPEC` 与版本化请求/响应模块契约。S1 由项目团队在进程内使用 Mock，不启动独立 HTTP 服务，也不需要真实模型 token；未来真实 Provider 的传输方式届时按需确定。
 
 - 校验请求与响应 Schema、contractVersion、invocationId。GENERATE_SPEC 的 SUCCESS 必须带有效 SpecDocumentV1；INTERVIEW 可以只有回复。completeness 仅供审阅提示，不能触发采用、锁定或发布。
 - Mock 用稳定的合成 fixture 给出可重复访谈和候选。测试可以注入延迟、FAILED、缺少 Spec、错误关联 ID 或非法文档；不开放“跳过登录”的演示入口。

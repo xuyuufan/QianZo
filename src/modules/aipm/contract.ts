@@ -5,9 +5,10 @@ import { specDocumentSchema } from "@/modules/specs/document";
 import { AipmError } from "./errors";
 
 /**
- * Shared AIPM contract (blueprint section 6): the HTTP protocol is fixed even
- * though S1 calls the in-process mock. Both directions are validated with the
- * same schemas so a real adapter cannot hand the platform an unchecked payload.
+ * Shared AIPM module contract (blueprint section 6): the versioned request and
+ * response schema is independent of transport. S1 calls the in-process mock;
+ * a future Provider may use HTTP. Both directions use these schemas so the
+ * platform never accepts an unchecked payload.
  */
 
 export const AIPM_CONTRACT_VERSION = "1";
