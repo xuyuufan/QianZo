@@ -1,16 +1,36 @@
 # Qianzo 项目状态
 
-更新时间：2026-10-02（Codex 最新评审修复与回归完成；PR #3 的 16 条评审线程均已解决）
+更新时间：2026-10-15（现有 PR 基线收尾；FIX-BASELINE 主模型审核 PASS，本地提交未推送）
 
-当前分支：`feat/lovable-ui-parity`（基于 `feat/s1-spec-publish` 的 `736c42c`；已推送，对应开放的 [PR #3](https://github.com/xuyuufan/QianZo/pull/3)）。
+当前分支：`codex/s1-review-closeout`，以 `feat/lovable-ui-parity` 的 `1d54e02` 为基线；本轮修复已本地提交，尚未推送。
 
-上游分支：`feat/s1-spec-publish`（`736c42c`）已推送并对应开放的 [PR #2](https://github.com/xuyuufan/QianZo/pull/2)，仍待合并。PR #3 当前以该分支为 base。
+远端状态：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) 与依赖它的 [PR #3](https://github.com/xuyuufan/QianZo/pull/3) 仍为 OPEN；本分支未推送，不能视为远端评审线程已解决。PR #3 有 3 条新未解决意见；PR #2 的 10 条未解决线程中，当前源码抽查的对应修复已存在，本记录不将其当成新缺陷，也不声称远端已 resolved。
 
-当前 Slice：S1「需求变成可招募项目」已完成本地实现、升级与空库重建验证；本轮为 UI 对齐，不新增 Slice；S2 未开始。
+当前 Slice：S1「需求变成可招募项目」已完成本地实现与验证；FIX-BASELINE 修复已通过主模型审核并本地提交。S2 尚未开始，待更新既有 PR、获得用户合并授权并复验合并基线后，从 `main` 开始。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
 
-## Codex 最新评审修复（2026-10-02）
+## FIX-BASELINE 评审修复（2026-10-15）
+
+PR #3 的新意见仍保持远端未解决状态；以下本地修复与生产回归已通过主模型审核并提交：
+
+| 新评审意见 | 本地处理与证据 |
+|---|---|
+| [公开 Spec 的结构 ID 通过 RSC/Flight 泄露](https://github.com/xuyuufan/QianZo/pull/3#discussion_r4164384769) | `SpecDocumentView` 在公开模式下对所有列表使用序号 key；未知角色、功能和交付物引用显示通用文案。修复前生产测试在初始 HTML 和真实客户端导航请求的同会话 Flight 重放载荷中均找到 15 个特制 ID；修复后两者均不含这些 ID，企业私有 Spec 仍保留它们。单元测试另覆盖缺失引用 fallback。 |
+| [单角色用户无法从 header 打开身份设置](https://github.com/xuyuufan/QianZo/pull/3#discussion_r4164384780) | `ProjectHeader` 对所有已登录角色显示「身份设置」入口；生产 E2E 覆盖 Enterprise-only、Builder-only 经入口添加 Enterprise，以及双角色切换；双角色 header 在 390px 下无水平溢出。 |
+| [最终 production E2E 数量记录过期](https://github.com/xuyuufan/QianZo/pull/3#discussion_r4164384790) | 新增公开 HTML/Flight 隐私回归后，本轮完整 production E2E 为 **15/15 通过**；2026-10-02 的 14 例是当时历史数量。 |
+
+本轮实际验证：`corepack pnpm typecheck`、`lint` 通过；单元 **12 文件 / 100 例**、集成 **9 文件 / 115 例**通过；`corepack pnpm test:e2e` 以生产构建运行，**15 例全部通过（约 1.4 分钟）**。另行执行的 `corepack pnpm build` 通过，Next.js 16.3.5 输出 **11 个 app 路由**。修复前先运行公开 ID 和身份入口回归，复现上述问题；第一次 E2E 探针的响应体读取竞态已修正后才记录泄露结果。没有执行 `db:reset`。
+
+失败边界：修复前完整 production E2E 为 **12/15**；两条身份用例确实因缺少设置入口失败，公开 ID 用例首次失败是测试探针在导航后读取响应体的竞态，不作为产品缺陷证据。修正探针后，在未修改产品代码的构建上，独立回归从原始 HTML 和真实 Link 导航请求的同会话 Flight 重放中复现 15 个 ID 泄露，同时确认私有 Spec 保留 ID。
+
+复用检查：参考 [React 官方渲染列表与 key 文档源码](https://github.com/reactjs/react.dev/blob/main/src/content/learn/rendering-lists.md)，没有找到需要引入的外部实现；按当前静态有序列表使用序号 key，不复制代码或引入依赖。实现前还阅读了本地 Next.js 16.3.5 `data-security.md`、`server-actions.md` 与 `Link` 文档，依据 RSC/Flight 序列化边界加原始载荷回归；未采用外部框架或测试基础设施。
+
+本轮没有 push、创建 PR、评论或关闭 GitHub 线程，也没有 merge。S2 等待更新既有 PR、用户授权合并及合并基线复验；PR #2/#3 的合并依赖及次序保持不变。
+
+## Codex 评审修复历史记录（2026-10-02，按当时状态）
+
+以下评审线程数量、分支和远端状态截至 2026-10-02；新的状态见上方 FIX-BASELINE 记录。
 
 针对 `e68b0d9` 上新增的 3 条 P2，逐条复现后完成修复；代码与回归用例提交为 `68b5193`，已推送到 PR #3。
 

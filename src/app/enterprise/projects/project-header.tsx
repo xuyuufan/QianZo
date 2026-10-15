@@ -53,6 +53,7 @@ export function ProjectHeader({
             <span className={`size-1.5 rounded-full ${role === "requester" ? "bg-requester" : "bg-builder"}`} />
             {role === "requester" ? "需求方" : "开发者"}
           </span>
+          <Link href="/onboarding" className="hover:text-foreground">身份设置</Link>
           {canSwitchRole ? (
             <Link href={switchHref} className="hover:text-foreground">重新选择身份</Link>
           ) : null}

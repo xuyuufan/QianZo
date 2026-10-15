@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
@@ -7,11 +8,13 @@ import postgres from "postgres";
 import { clearDemoBusinessData } from "../helpers/demo-data";
 import { loginDemoUser } from "../helpers/demo-login";
 import { insertVisualOpenProjects } from "../helpers/ui-visual-fixtures";
+import { validSpecDocument } from "../helpers/spec-fixture";
 import {
   loadLocalEnv,
   requireLoopbackApiUrl,
   requireLoopbackDatabaseUrl,
 } from "../helpers/local-env";
+import type { SpecDocumentV1 } from "@/modules/specs/document";
 
 const { tools, app } = loadLocalEnv(resolve(process.cwd()));
 if (!tools.DEMO_USER_PASSWORD || !tools.SUPABASE_SERVICE_ROLE_KEY) {
@@ -469,6 +472,164 @@ test("a draft becomes a published recruitment project end to end", async ({
   expect(recruitmentBody).not.toContain("未发布");
   await builderContext.close();
 });
+
+test("public recruitment HTML and client Flight hide structural Spec ids", async ({ browser, page }) => {
+  test.setTimeout(90_000);
+  const { document, ids } = specWithSensitiveStructuralIds();
+  const projectId = await insertSensitiveIdFixture(adminSql, enterpriseAUserId, document);
+  const password = tools.DEMO_USER_PASSWORD!;
+
+  await loginDemoUser(page, builderOnlyEmail, password);
+  const publicResponse = await page.goto(`/projects/${projectId}`);
+  expect(publicResponse?.status()).toBe(200);
+  const publicHtml = (await publicResponse?.text()) ?? "";
+  await expect(page.getByRole("heading", { name: "公开结构标识回归项目" })).toBeVisible();
+  const publicHtmlLeaks = ids.filter((id) => publicHtml.includes(id));
+  expect.soft(publicHtmlLeaks, "public HTML and its embedded Flight payload must omit structural ids").toEqual([]);
+
+  // Block Next's optional link prefetch so the click must request the route's
+  // actual client-navigation Flight payload, which is checked as raw text.
+  const routePath = `/projects/${projectId}`;
+  await page.route(`**${routePath}*`, async (route) => {
+    if (route.request().headers()["next-router-prefetch"] === "1") {
+      await route.abort();
+      return;
+    }
+    await route.continue();
+  });
+  await page.goto("/projects");
+  const flightRequestPromise = page.waitForRequest((request) => {
+    const headers = request.headers();
+    return new URL(request.url()).pathname === routePath &&
+      headers.rsc === "1" &&
+      headers["next-router-prefetch"] !== "1";
+  });
+  const [, flightRequest] = await Promise.all([
+    page.getByRole("link", { name: /公开结构标识回归项目/ }).click(),
+    flightRequestPromise,
+  ]);
+  const requestHeaders = flightRequest.headers();
+  expect(requestHeaders.rsc).toBe("1");
+  expect(requestHeaders["next-router-prefetch"]).toBeUndefined();
+  expect(flightRequest.resourceType()).toBe("fetch");
+  expect(flightRequest.isNavigationRequest()).toBe(false);
+  const replayHeaders = Object.fromEntries(
+    ["accept", "next-router-state-tree", "next-url", "rsc"].flatMap((name) =>
+      requestHeaders[name] ? [[name, requestHeaders[name]]] : [],
+    ),
+  );
+  // Playwright may discard a response body as its client navigation completes.
+  // Replay the observed navigation request in the same session to inspect its raw Flight payload.
+  const flightReplay = await page.context().request.get(flightRequest.url(), { headers: replayHeaders });
+  expect(flightReplay.status()).toBe(200);
+  expect(flightReplay.headers()["content-type"]).toContain("text/x-component");
+  const flightPayload = await flightReplay.text();
+  await expect(page).toHaveURL(new RegExp(`${routePath.replaceAll("/", "\\/")}$`));
+  const flightLeaks = ids.filter((id) => flightPayload.includes(id));
+  expect.soft(flightLeaks, "client-navigation Flight payload must omit structural ids").toEqual([]);
+
+  const enterpriseContext = await browser.newContext({ baseURL: "http://127.0.0.1:3000" });
+  const enterprisePage = await enterpriseContext.newPage();
+  await loginDemoUser(enterprisePage, "enterprise-a@qianzo.local", password);
+  const privateResponse = await enterprisePage.goto(`/enterprise/projects/${projectId}/spec`);
+  expect(privateResponse?.status()).toBe(200);
+  const privateHtml = (await privateResponse?.text()) ?? "";
+  const privateMissingIds = ids.filter((id) => !privateHtml.includes(id));
+  await enterpriseContext.close();
+
+  expect.soft(privateMissingIds, "the enterprise's private Spec must preserve structural ids").toEqual([]);
+});
+
+function specWithSensitiveStructuralIds() {
+  const document = structuredClone(validSpecDocument());
+  const ids: string[] = [];
+  const marker = (kind: string, index: number) => {
+    const id = `ZZSECRET-${kind}-${index}`;
+    ids.push(id);
+    return id;
+  };
+
+  const roleIds = new Map(document.userRoles.map((role, index) => [role.id, marker("ROLE", index)]));
+  document.userRoles = document.userRoles.map((role) => ({ ...role, id: roleIds.get(role.id)! }));
+
+  const featureIds = new Map(document.features.map((feature, index) => [feature.id, marker("FEATURE", index)]));
+  document.features = document.features.map((feature) => ({
+    ...feature,
+    id: featureIds.get(feature.id)!,
+    userRoleIds: feature.userRoleIds.map((id) => roleIds.get(id)!),
+  }));
+  document.pages = document.pages.map((page, index) => ({
+    ...page,
+    id: marker("PAGE", index),
+    featureIds: page.featureIds.map((id) => featureIds.get(id)!),
+  }));
+  document.userFlows = document.userFlows.map((flow, index) => ({ ...flow, id: marker("FLOW", index) }));
+  document.integrations = [{
+    id: marker("INTEGRATION", 0),
+    name: "本地合成集成",
+    purpose: "验证公开 Spec 的结构标识脱敏。",
+    constraints: "仅用于本地 E2E 回归。",
+  }];
+
+  const deliverableIds = new Map(document.deliverables.map((deliverable, index) => [deliverable.id, marker("DELIVERABLE", index)]));
+  document.deliverables = document.deliverables.map((deliverable) => ({
+    ...deliverable,
+    id: deliverableIds.get(deliverable.id)!,
+  }));
+  document.milestones = document.milestones.map((milestone, index) => ({
+    ...milestone,
+    id: marker("MILESTONE", index),
+    deliverableIds: milestone.deliverableIds.map((id) => deliverableIds.get(id)!),
+    acceptanceCriteria: milestone.acceptanceCriteria.map((criterion, criterionIndex) => ({
+      ...criterion,
+      id: marker(`CRITERION-${index}`, criterionIndex),
+    })),
+  }));
+  return { document, ids };
+}
+
+async function insertSensitiveIdFixture(
+  sql: ReturnType<typeof postgres>,
+  ownerId: string,
+  document: SpecDocumentV1,
+) {
+  const projectId = randomUUID();
+  const versionId = randomUUID();
+  const title = "公开结构标识回归项目";
+  const goal = "验证公开招募页面不会序列化 Spec 内部结构标识。";
+  const snapshot = {
+    schemaVersion: 1,
+    lockedSpecVersionId: versionId,
+    title,
+    budget: { minMinor: 1000000, maxMinor: 2500000, currency: "CNY" },
+    document,
+  };
+
+  await sql.begin(async (transaction) => {
+    await transaction`
+      insert into app.projects (id, owner_id, title, original_requirement)
+      values (${projectId}, ${ownerId}, ${title}, ${goal})
+    `;
+    await transaction`
+      insert into app.spec_versions (id, project_id, version_no, schema_version, content, created_by)
+      values (${versionId}, ${projectId}, 1, 1, ${transaction.json(document)}, ${ownerId})
+    `;
+    await transaction`
+      update app.projects
+      set current_spec_version_id = ${versionId},
+          budget_min_minor = 1000000,
+          budget_max_minor = 2500000,
+          currency = 'CNY',
+          locked_spec_version_id = ${versionId},
+          locked_at = now(),
+          status = 'OPEN',
+          published_spec_snapshot = ${transaction.json(snapshot)},
+          published_at = now()
+      where id = ${projectId}
+    `;
+  });
+  return projectId;
+}
 
 async function expectNoHorizontalOverflow(page: Page) {
   const { clientWidth, scrollWidth } = await page.evaluate(() => ({

@@ -58,8 +58,8 @@ export function SpecDocumentView({ document, idPrefix = "", showIds = true }: Sp
 
         <SpecSection index={2} title={headings[1]} idPrefix={idPrefix}>
           <div className="divide-y divide-border border-y border-border">
-            {document.userRoles.length === 0 ? <p className="py-4 font-zh text-sm text-muted-foreground">未指定</p> : document.userRoles.map((role) => (
-              <div key={role.id} className="grid gap-2 py-4 sm:grid-cols-[minmax(0,160px)_minmax(0,1fr)]">
+            {document.userRoles.length === 0 ? <p className="py-4 font-zh text-sm text-muted-foreground">未指定</p> : document.userRoles.map((role, index) => (
+              <div key={showIds ? role.id : index} className="grid gap-2 py-4 sm:grid-cols-[minmax(0,160px)_minmax(0,1fr)]">
                 <div>{showIds ? <span className="font-brand text-[10px] text-muted-foreground">{role.id}</span> : null}<h3 className="mt-1 font-zh text-sm">{role.name}</h3></div>
                 <p className="font-zh text-sm leading-6 text-muted-foreground">{role.description}</p>
               </div>
@@ -70,11 +70,11 @@ export function SpecDocumentView({ document, idPrefix = "", showIds = true }: Sp
         <SpecSection index={3} title={headings[2]} idPrefix={idPrefix}>
           <div className="space-y-3">
             {document.features.map((feature, index) => (
-              <div key={feature.id} className="border border-border bg-card">
+              <div key={showIds ? feature.id : index} className="border border-border bg-card">
                 <div className="grid gap-2 px-5 py-4 sm:grid-cols-[72px_minmax(0,1fr)]">
                   <span className="font-brand text-xs text-muted-foreground">{showIds ? feature.id : ordinal(index)}</span>
                   <div><h3 className="font-zh text-sm font-medium">{feature.title}</h3><p className="mt-2 font-zh text-sm leading-6 text-muted-foreground">{feature.description}</p>
-                    <p className="mt-3 font-zh text-xs text-muted-foreground">使用角色：{feature.userRoleIds.map((id) => roleNames.get(id) ?? id).join("、") || "未指定"}</p>
+                    <p className="mt-3 font-zh text-xs text-muted-foreground">使用角色：{feature.userRoleIds.map((id) => roleNames.get(id) ?? (showIds ? id : "未指定")).join("、") || "未指定"}</p>
                   </div>
                 </div>
               </div>
@@ -85,8 +85,8 @@ export function SpecDocumentView({ document, idPrefix = "", showIds = true }: Sp
 
         <SpecSection index={4} title={headings[3]} idPrefix={idPrefix}>
           <div className="divide-y divide-border border-y border-border">
-            {document.pages.map((page) => (
-              <div key={page.id} className="py-4">{showIds ? <p className="font-brand text-[10px] text-muted-foreground">{page.id}</p> : null}<h3 className="mt-1 font-zh text-sm">{page.name}</h3><p className="mt-2 font-zh text-sm leading-6 text-muted-foreground">{page.purpose}</p><p className="mt-2 font-zh text-xs text-muted-foreground">关联功能：{page.featureIds.map((id) => featureTitles.get(id) ?? id).join("、") || "未指定"}</p></div>
+            {document.pages.map((page, index) => (
+              <div key={showIds ? page.id : index} className="py-4">{showIds ? <p className="font-brand text-[10px] text-muted-foreground">{page.id}</p> : null}<h3 className="mt-1 font-zh text-sm">{page.name}</h3><p className="mt-2 font-zh text-sm leading-6 text-muted-foreground">{page.purpose}</p><p className="mt-2 font-zh text-xs text-muted-foreground">关联功能：{page.featureIds.map((id) => featureTitles.get(id) ?? (showIds ? id : "未指定")).join("、") || "未指定"}</p></div>
             ))}
           </div>
           {document.pages.length === 0 ? <Empty /> : null}
@@ -94,11 +94,11 @@ export function SpecDocumentView({ document, idPrefix = "", showIds = true }: Sp
 
         <SpecSection index={5} title={headings[4]} idPrefix={idPrefix}>
           <div className="space-y-5">
-            {document.userFlows.map((flow) => (
-              <section key={flow.id} className="border-l border-border pl-4">
+            {document.userFlows.map((flow, flowIndex) => (
+              <section key={showIds ? flow.id : flowIndex} className="border-l border-border pl-4">
                 {showIds ? <p className="font-brand text-[10px] text-muted-foreground">{flow.id}</p> : null}<h3 className="mt-1 font-zh text-sm">{flow.name}</h3>
                 <ol className="mt-3 space-y-2">
-                  {flow.steps.map((step, index) => <li key={`${flow.id}-${index}`} className="flex gap-3 font-zh text-sm leading-6"><span className="font-brand text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</span><span>{step}</span></li>)}
+                  {flow.steps.map((step, index) => <li key={showIds ? `${flow.id}-${index}` : index} className="flex gap-3 font-zh text-sm leading-6"><span className="font-brand text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</span><span>{step}</span></li>)}
                 </ol>
               </section>
             ))}
@@ -109,7 +109,7 @@ export function SpecDocumentView({ document, idPrefix = "", showIds = true }: Sp
         <SpecSection index={6} title={headings[5]} idPrefix={idPrefix}>
           <div className="divide-y divide-border border-y border-border">
             {document.integrations.map((integration, index) => (
-              <div key={integration.id} className="grid gap-2 py-4 sm:grid-cols-[72px_minmax(0,1fr)]"><span className="font-brand text-xs text-muted-foreground">{showIds ? integration.id : ordinal(index)}</span><div><h3 className="font-zh text-sm">{integration.name}</h3><p className="mt-2 font-zh text-sm leading-6 text-muted-foreground">{integration.purpose}</p><p className="mt-2 font-zh text-xs text-muted-foreground">约束：{integration.constraints}</p></div></div>
+              <div key={showIds ? integration.id : index} className="grid gap-2 py-4 sm:grid-cols-[72px_minmax(0,1fr)]"><span className="font-brand text-xs text-muted-foreground">{showIds ? integration.id : ordinal(index)}</span><div><h3 className="font-zh text-sm">{integration.name}</h3><p className="mt-2 font-zh text-sm leading-6 text-muted-foreground">{integration.purpose}</p><p className="mt-2 font-zh text-xs text-muted-foreground">约束：{integration.constraints}</p></div></div>
             ))}
           </div>
           {document.integrations.length === 0 ? <Empty /> : null}
@@ -121,7 +121,7 @@ export function SpecDocumentView({ document, idPrefix = "", showIds = true }: Sp
 
         <SpecSection index={8} title={headings[7]} idPrefix={idPrefix}>
           <div className="divide-y divide-border border-y border-border">
-            {document.deliverables.map((item, index) => <div key={item.id} className="grid gap-2 py-4 sm:grid-cols-[72px_minmax(0,1fr)]"><span className="font-brand text-xs text-muted-foreground">{showIds ? item.id : ordinal(index)}</span><div><h3 className="font-zh text-sm">{item.title}</h3><p className="mt-2 font-zh text-sm leading-6 text-muted-foreground">{item.description}</p></div></div>)}
+            {document.deliverables.map((item, index) => <div key={showIds ? item.id : index} className="grid gap-2 py-4 sm:grid-cols-[72px_minmax(0,1fr)]"><span className="font-brand text-xs text-muted-foreground">{showIds ? item.id : ordinal(index)}</span><div><h3 className="font-zh text-sm">{item.title}</h3><p className="mt-2 font-zh text-sm leading-6 text-muted-foreground">{item.description}</p></div></div>)}
           </div>
           {document.deliverables.length === 0 ? <Empty /> : null}
         </SpecSection>
@@ -129,18 +129,18 @@ export function SpecDocumentView({ document, idPrefix = "", showIds = true }: Sp
         <SpecSection index={9} title={headings[8]} idPrefix={idPrefix}>
           <div className="space-y-5">
             {document.milestones.map((milestone, index) => (
-              <section key={milestone.id} className="border border-border bg-card">
+              <section key={showIds ? milestone.id : index} className="border border-border bg-card">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
                   <div><p className="font-brand text-[10px] uppercase tracking-[0.16em] text-muted-foreground">M{String(index + 1).padStart(2, "0")}{showIds ? ` · ${milestone.id}` : ""}</p><h3 className="mt-2 font-zh text-sm">{milestone.title}</h3></div>
                   <span className="font-zh text-xs text-muted-foreground">累计第 {milestone.dueAfterDays} 个自然日</span>
                 </div>
                 <div className="space-y-4 px-5 py-4">
                   <p className="font-zh text-sm leading-6 text-muted-foreground">{milestone.description}</p>
-                  <p className="font-zh text-xs text-muted-foreground">交付物：{milestone.deliverableIds.map((id) => deliverableTitles.get(id) ?? id).join("、") || "未指定"}</p>
+                  <p className="font-zh text-xs text-muted-foreground">交付物：{milestone.deliverableIds.map((id) => deliverableTitles.get(id) ?? (showIds ? id : "未指定")).join("、") || "未指定"}</p>
                   <div className="border-t border-border pt-4">
                     <p className="font-brand text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Acceptance criteria</p>
                     <ul className="mt-3 space-y-4">
-                      {milestone.acceptanceCriteria.map((criterion, criterionIndex) => <li key={criterion.id} data-testid="public-acceptance-criterion" className="grid gap-2 sm:grid-cols-[48px_minmax(0,1fr)]"><span className="font-brand text-[10px] text-muted-foreground">{showIds ? criterion.id : ordinal(criterionIndex)}</span><div><p className="font-zh text-sm leading-6">{criterion.description}</p><p className="mt-2 font-zh text-xs leading-5 text-muted-foreground">验证方式：{criterion.verificationMethod}</p></div></li>)}
+                      {milestone.acceptanceCriteria.map((criterion, criterionIndex) => <li key={showIds ? criterion.id : criterionIndex} data-testid="public-acceptance-criterion" className="grid gap-2 sm:grid-cols-[48px_minmax(0,1fr)]"><span className="font-brand text-[10px] text-muted-foreground">{showIds ? criterion.id : ordinal(criterionIndex)}</span><div><p className="font-zh text-sm leading-6">{criterion.description}</p><p className="mt-2 font-zh text-xs leading-5 text-muted-foreground">验证方式：{criterion.verificationMethod}</p></div></li>)}
                       {milestone.acceptanceCriteria.length === 0 ? <li className="font-zh text-sm text-muted-foreground">未指定</li> : null}
                     </ul>
                   </div>

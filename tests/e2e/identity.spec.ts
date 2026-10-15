@@ -93,6 +93,10 @@ test("a first-time Auth user completes onboarding through the real UI", async ({
 
   await expect(page).toHaveURL(/\/enterprise\/projects$/);
   await expect(page.getByRole("heading", { name: "我的项目" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "身份设置" })).toBeVisible();
+  await page.getByRole("link", { name: "身份设置" }).click();
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page.getByRole("checkbox", { name: /企业/ })).toBeChecked();
 });
 
 test("an onboarded user returns to onboarding to add the ENTERPRISE role", async ({ page }) => {
@@ -107,7 +111,8 @@ test("an onboarded user returns to onboarding to add the ENTERPRISE role", async
   await page.getByRole("button", { name: "完成设置" }).click();
 
   await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/projects$/);
-  await page.goto("/onboarding");
+  await expect(page.getByRole("link", { name: "身份设置" })).toBeVisible();
+  await page.getByRole("link", { name: "身份设置" }).click();
 
   await expect(page).toHaveURL(/\/onboarding$/);
   await expect(page.getByLabel("显示名")).toHaveValue("再次设置用户");
@@ -118,6 +123,17 @@ test("an onboarded user returns to onboarding to add the ENTERPRISE role", async
 
   await expect(page).toHaveURL(/\/enterprise\/projects$/);
   await expect(page.getByRole("heading", { name: "我的项目" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "重新选择身份" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "身份设置" })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { clientWidth, scrollWidth } = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  await page.getByRole("link", { name: "重新选择身份" }).click();
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:3000\/projects$/);
+  await expect(page.getByRole("link", { name: "身份设置" })).toBeVisible();
 });
 
 test("requester intent survives login and directs a Builder to role onboarding", async ({ page }) => {
