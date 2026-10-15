@@ -13,7 +13,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests --exclude tests/integration/** --exclude tests/e2e/**",
+    "test": "vitest run --exclude tests/integration/** --exclude tests/e2e/**",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "db:start": "supabase start",

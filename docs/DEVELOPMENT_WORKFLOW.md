@@ -94,6 +94,12 @@ Git 用户身份从现有配置或用户提供的信息取得，不猜测姓名�
 
 具体命令以仓库 scripts 为准，初始化时建立并写入 README；不要在交付记录中虚构尚不存在或未运行的命令。已有无关基线失败必须说明，不能隐藏；属于本任务验收的失败必须解决。
 
+本机（Windows + 本地 Supabase）实际验证顺序与两点环境差异：
+
+- 顺序：`corepack pnpm typecheck` → `lint` → `test` → `test:integration` → `build` → `start` → `test:e2e`。E2E 对**生产构建**运行（先 `build` 再 `start`，配置里的 `reuseExistingServer` 会复用 3000 端口）；`next dev` 冷启动会为首个用例现场编译 Server Action，容易造成假失败。
+- `build` 与 `test:e2e` 会重建 `.next/` 与 `test-results/`，在带批量删除保护的环境里需要显式授权，这不影响项目本身的可构建性。
+- 改已应用的 migration 时优先另开新文件；必须改写时用 `supabase migration repair <version> --status reverted --local` 后 `migration up --local` 重放，前提是该迁移可重跑（只做 drop/add/revoke/grant）。
+
 ## 7. Commit message
 
 采用简单格式，不引入自动发布、版本号或 commitlint 系统：

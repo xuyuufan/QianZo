@@ -162,6 +162,12 @@ select {
   color: #075f50;
 }
 
+.form-message.info {
+  border: 1px solid #a9c3dc;
+  background: #f2f7fc;
+  color: #1c4a75;
+}
+
 .role-fieldset {
   display: grid;
   gap: 0.75rem;
@@ -231,6 +237,12 @@ select {
   margin-left: 1rem;
   color: var(--muted);
   font-size: 0.875rem;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
 }
 
 .empty-state {
@@ -308,6 +320,168 @@ select {
 
 .back-link {
   width: fit-content;
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.subsection-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.step-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.step-links .button-link {
+  width: fit-content;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.field-row {
+  display: grid;
+  gap: 1.1rem;
+}
+
+@media (min-width: 34rem) {
+  .field-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-actions .button.secondary {
+  margin-top: 0;
+}
+
+.interview-thread {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.interview-message {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--paper);
+}
+
+.interview-message-user {
+  border-color: #8bc7b8;
+  background: #effbf7;
+}
+
+.interview-role {
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.interview-content {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+
+.spec-preview {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.spec-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.spec-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.spec-section p,
+.spec-section ul,
+.spec-section ol {
+  margin: 0;
+}
+
+.spec-section ul,
+.spec-section ol {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.25rem;
+  line-height: 1.65;
+}
+
+.spec-muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.spec-milestone {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--paper);
+}
+
+.spec-json {
+  font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.issue-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem 0.75rem 2rem;
+  border: 1px solid #d9a4a0;
+  border-radius: 0.75rem;
+  background: #fff3f2;
+  color: #8f2018;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.version-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.version-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--paper);
+}
+
+.version-list a {
   color: var(--accent);
   font-weight: 650;
   text-decoration: none;
