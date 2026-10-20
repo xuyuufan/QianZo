@@ -118,11 +118,11 @@ Spec 版本分配在 Project 行锁内进行，最大版本号加一并以 UNIQU
 
 ### Contract 和 Mock
 
-复用总纲的 `AipmGateway.invoke(AipmRequest): Promise<AipmResponse>`、`INTERVIEW` / `GENERATE_SPEC` 与版本化 `POST /v1/invocations` 协议。S1 进程内使用 Mock，不必启动 HTTP 服务，也不需要真实模型 token。
+复用总纲的 `AipmGateway.invoke(AipmRequest): Promise<AipmResponse>`、`INTERVIEW` / `GENERATE_SPEC` 与版本化请求/响应模块契约。S1 由项目团队在进程内使用 Mock，不启动独立 HTTP 服务，也不需要真实模型 token；未来真实 Provider 的传输方式届时按需确定。
 
 - 校验请求与响应 Schema、contractVersion、invocationId。GENERATE_SPEC 的 SUCCESS 必须带有效 SpecDocumentV1；INTERVIEW 可以只有回复。completeness 仅供审阅提示，不能触发采用、锁定或发布。
 - Mock 用稳定的合成 fixture 给出可重复访谈和候选。测试可以注入延迟、FAILED、缺少 Spec、错误关联 ID 或非法文档；不开放“跳过登录”的演示入口。
-- 输入长度、消息总量和响应体积设明确上限并测试，失败显示可理解提示；不靠静默截断丢掉需求或候选。
+- 输入长度、消息体积与单次请求 transcript 设明确上限并测试，失败显示可理解提示；不靠静默截断丢掉需求或候选。边界说明（2026-10-15）：`aipmLimits.messagesPerRequest` 限制单次 transcript 为 40 条。Mock 会话另用 40 条 admission cap；`begin` 只检查当前历史加上本轮 USER 与 ASSISTANT 后是否仍在阈值内（当前历史最多 38 条），不登记 in-flight reservation。Provider 失败只落 USER；并发下已接纳调用的合法回复仍保存，因此持久历史可能超过 40。从空历史按当前 begin/complete 语义推导最多 78 条（未实测）。该边界只描述本地 Mock；接入真实 Provider 前重新验证资源和并发限制。
 - 平台持有会话和消息，Mock 不自行写数据库。协议实现需要可共享的类型、校验器和示例；若后续另建 AIPM_CONTRACT 文档，应由总纲引用唯一完整定义，避免并列维护两份协议。
 
 ### 调用与过期候选
@@ -138,7 +138,7 @@ Spec 版本分配在 Project 行锁内进行，最大版本号加一并以 UNIQU
 
 ### 编辑与锁定
 
-- 审阅页面提供完整结构化预览与可编辑表单；首轮可使用带字段错误提示的 JSON 编辑区，但必须能通过 UI 修改并保存，不以直接改库代替。
+- 审阅页面提供完整结构化预览与覆盖 SpecDocumentV1 全部字段的可编辑表单。当前 UI 使用按章节组织的字段、条目和里程碑编辑器，保存前显示对应字段错误；不需要直接编辑 JSON 或数据库。
 - 手工保存和采用都新增 SpecVersion；旧版本不覆盖、不删除。手工保存不伪装成采用已有候选。
 - 共享校验器完整落实总纲附录 A：必要内容非空、元素 ID 稳定且无重复、引用有效、至少一条里程碑验收标准、dueAfterDays 为正整数并严格递增。Schema 合法不等于企业已经确认需求。
 - 锁定必须由企业明确确认当前已保存 Spec，验证版本一致及参考预算完整。事务设置 locked 指针/时间、递增版本；项目仍是 DRAFT，不新增 LOCKED 状态。
@@ -263,3 +263,9 @@ S1 已于 2026-09-24 按上述六个任务实施完成，实施顺序、每个�
 - `ON DELETE RESTRICT` 无法被 `DEFERRABLE` 延迟检查，因此 `projects` 指向 `spec_versions` 的两个复合外键改为 `NO ACTION + DEFERRABLE INITIALLY DEFERRED`，使带历史的项目能在同一事务内删除；其余外键保持 `RESTRICT`。
 - 空库重建的验证在独立 scratch 数据库上完成，仅用最小 `auth.users` 桩件替代 Supabase 平台对象；`supabase db reset --local` 未执行，以遵守「不擅自清空用户本地草稿」。
 - E2E 对生产构建运行：`playwright.config.ts` 的 `webServer.command` 为 `corepack pnpm build && corepack pnpm start`，能在全新环境自行构建并启动生产服务；`next dev` 冷启动会现场编译 Server Action 并造成首个用例假失败，生产服务无此抖动。本机非 CI 环境仍保留 `reuseExistingServer`，可复用已运行的服务。
+
+## UI 接入补充（2026-09-25）
+
+本 Slice 的页面现已接入 Qianzo Flow 视觉，并使用现有 S0/S1 服务端数据与动作完成「真实登录 → 草稿 → Mock 访谈 → 结构化 Spec 与版本 → 锁定 → 企业 Mock 定金 → 结构化脱敏 → 发布 → Builder 招募浏览」。完整 Spec 与每条验收标准/验证方法均可编辑或查看；脱敏编辑只开放文字。接入设计与本轮实际验证记录见 [UI 接入设计](../../UI_REWORK_DESIGN.md) 和 [项目状态](../../PROJECT_STATUS.md)。
+
+桌面/手机布局、键盘导航、减少动态效果及素材独立性由 E2E 覆盖；本轮整套 E2E 使用新生产构建和真实本地 Supabase/PostgreSQL。未增加数据库表、migration 或 HTTP API，也未开始 S2。

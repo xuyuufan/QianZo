@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getActorById } from "@/modules/identity/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
-import { ProjectHeader } from "../project-header";
+import { ProjectHeader, projectHeaderRoles } from "../project-header";
 import { CreateProjectForm } from "./create-project-form";
 
 export const dynamic = "force-dynamic";
@@ -20,17 +19,11 @@ export default async function NewProjectPage() {
   if (!actor.roles.includes("ENTERPRISE")) redirect("/");
 
   return (
-    <main className="workspace-shell">
-      <ProjectHeader />
-      <section className="workspace-content">
-        <Link className="back-link" href="/enterprise/projects">← 返回项目列表</Link>
-        <div>
-          <p className="eyebrow">新项目</p>
-          <h1 className="section-title">创建项目草稿</h1>
-          <p className="lede">先保存原始需求，后续切片再进入 AIPM 访谈。</p>
-        </div>
+    <div className="qz-paper min-h-[100svh]">
+      <ProjectHeader fullBleed availableRoles={projectHeaderRoles(actor.roles)} />
+      <main className="qz-rise mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
         <CreateProjectForm projectId={randomUUID()} />
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }

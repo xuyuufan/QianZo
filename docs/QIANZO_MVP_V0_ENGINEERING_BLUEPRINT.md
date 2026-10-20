@@ -39,7 +39,7 @@
 | SpecVersion 不可变，锁定后不可修改 | `V0 REQUIRED` | JSONB 版本内容及锁定指针 |
 | Submission 与验收历史 | `V0 REQUIRED` | 新提交新增记录，旧结论不覆盖 |
 | 关键事务、唯一约束与状态检查 | `V0 REQUIRED` | 防止重复申请、并发选择、重复开工 |
-| 版本化 AIPM HTTP Contract | `V0 REQUIRED` | 平台与开发者 B 可以并行 |
+| 版本化 AIPM 模块契约 | `V0 REQUIRED` | 平台与 AIPM 由同一项目团队负责；内部边界为未来 Provider 替换与协议验证保留 |
 | PaymentProvider 接入边界 | `V0 REQUIRED` | 先有 Mock，不实现真实支付配套设施 |
 | 可迁移 SQL migration | `V0 REQUIRED` | 按业务能力增加 |
 | Docker、自部署能力 | `V0 HARDENING` | 本地闭环后验证，不绑定部署供应商 |
@@ -318,7 +318,7 @@ PENDING → IN_PROGRESS → IN_REVIEW → APPROVED
 
 **`V0 REQUIRED`**
 
-平台保留一个小接口：
+平台内部保留一个小接口，隔离业务调用与 Provider 实现：
 
 ```ts
 interface AipmGateway {
@@ -326,12 +326,7 @@ interface AipmGateway {
 }
 ```
 
-第一条 Slice 使用 `MockAipmGateway`。HTTP 协议从现在确定，开发者 B 可以直接按协议进行第一次真实模型调用。
-
-```http
-POST /v1/invocations
-Authorization: Bearer <service-token>
-```
+平台与 AIPM 由同一项目团队端到端负责。首条 Slice 使用 `MockAipmGateway`，在应用进程内调用，不启动独立 HTTP 服务。以下请求和响应类型是内部模块契约，也为未来真实 Provider 替换与协议验证保留；是否采用 HTTP 传输、以及具体端点和认证方式，待真实 Provider 方案确定时再设计，不扩大本次 Mock 范围或引入通用接口框架。
 
 最小请求：
 
@@ -401,7 +396,7 @@ type AipmResponse =
 - Spec Schema 延续原方案的业务结构，完整定义见附录 A；不要求第一周实现复杂文档编辑器。
 - 先支持企业手工编辑 Spec；专用 `REVISE_SPEC` 操作移至 `V0.5`。
 - invocationId 用于关联请求和响应，不承诺供应商跨进程恰好执行一次。
-- 平台持有 Session 和 Message；B 无需实现会话数据库。
+- 平台持有 Session 和 Message；Mock/Provider 只处理契约输入并返回候选结果，不直接访问平台数据库。
 - AIPM 只能提供候选结果，不能发布项目或锁定 Spec。
 
 ### 6.2 首轮最少保护
@@ -414,7 +409,7 @@ type AipmResponse =
 - 候选 Spec 采用时验证项目归属、Spec 未锁及版本仍匹配。
 - 同一候选不能重复采用。
 - 返回清楚的失败信息。
-- 接 HTTP 时设置请求超时，不透明自动重试。
+- 未来若采用 HTTP Provider，设置请求超时，不做不透明自动重试；当前进程内 Mock 不产生网络请求。
 
 `FAILED` 表示平台本次没有取得可采用的成功结果，**不表示模型一定没有执行或没有计费**。不需要为表达这一点先建设 UNKNOWN 状态机。
 
@@ -422,7 +417,7 @@ type AipmResponse =
 
 | 能力 | 等级 |
 |---|---|
-| 平台切换真实 HTTP Adapter | `V0.5`；可在本地闭环后立即安排 |
+| 按需接入真实 Provider，并验证现有模块契约 | `V0.5`；具体传输方式和时点由项目团队届时确定 |
 | AIPMRun 持久调用记录、UNKNOWN 和恢复 | `V0.5` |
 | token usage、providerRequestId、cost | `V0.5` |
 | cached tokens、pricing version | `V0.5`，有成本分析需求时 |
@@ -430,7 +425,7 @@ type AipmResponse =
 | 自动重试、队列、后台执行 | `LATER`，根据实际延迟和失败情况决定 |
 | 详细费用核算、预算控制 | `LATER` |
 
-这些字段不作为 B 首次交付可用 AI 的验收条件。真实 HTTP 接入前也不要求先完成全部 V0.5 项目。
+这些字段不属于首个本地 Mock 闭环的验收条件。未来接入真实 Provider 时，再按选定方式逐项定义；不要求先完成全部 V0.5 项目。
 
 ---
 
@@ -557,11 +552,11 @@ Builder 模拟押金成功时：
 | Phase 0：最小准备 | 能开始迭代 | IBQ-01～02 | 全量文档拆分、所有表、生产部署 |
 | Phase 1：本地 Vertical Slice | 合成项目到 COMPLETED | IBQ-03～10 | 真实 AI、文件、通知、通用审计、真实支付 |
 | Phase 2：V0 Hardening | 为外部试点补足权限和异常出口 | 产品决策确认、审计、重招、取消/暂停/终止、必要文件功能、异常测试 | 计费平台、队列、微服务 |
-| Phase 3：AIPM 增强 | 接入 B 的真实服务 | HTTP Adapter、协议测试、基本超时与失败处理 | 完整 token/cost accounting |
+| Phase 3：AIPM 增强 | 按需由项目团队接入真实 Provider | 复用内部模块契约，完成所选传输方式的协议验证、基本超时与失败处理 | 完整 token/cost accounting |
 | Phase 4：Deployment | 选定试点部署方式 | Docker、自部署验证、环境隔离、邮件、网络测试、备份恢复、基础监控 | 预先指定的 VPS 或海外云供应商 |
 | 后续：Real Payment | 跑通真实资金流程 | 先确定资金规则，再设计并实现收付、退款和对账 | 不得直接把 Mock 改名为真实支付 |
 
-Phase 2 与 Phase 3 可在本地闭环后并行。开发者 B 在 Phase 1 就可以依据 Contract 开发自己的模型实现。
+Phase 2 与 Phase 3 可在本地闭环后由同一项目团队按资源安排并行。Phase 3 不代表外部团队交付；真实 Provider 替换应复用内部模块契约，传输和验证范围在届时确认。
 
 ### 第一阶段的部署约束
 

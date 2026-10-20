@@ -22,7 +22,7 @@ export function AdoptCandidateForm({
   const [state, formAction, pending] = useActionState(action, emptySpecActionState);
 
   return (
-    <form action={formAction} className="project-form">
+    <form action={formAction} className="adopt-candidate-form">
       <input name="expectedVersion" type="hidden" value={version} />
       <input name="sourceMessageId" type="hidden" value={sourceMessageId} />
       {state.message ? (

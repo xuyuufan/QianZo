@@ -1,18 +1,13 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getActorById } from "@/modules/identity/service";
 import { listOpenRecruitments } from "@/modules/recruitment/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
-import { ProjectHeader } from "../enterprise/projects/project-header";
+import { ProjectHeader, projectHeaderRoles } from "../enterprise/projects/project-header";
+import { RecruitmentList } from "./recruitment-list";
 
 export const dynamic = "force-dynamic";
-
-const momentFormat = new Intl.DateTimeFormat("zh-CN", {
-  dateStyle: "short",
-  timeZone: "Asia/Shanghai",
-});
 
 export default async function RecruitmentListPage() {
   const userId = await getVerifiedUserId();
@@ -24,42 +19,21 @@ export default async function RecruitmentListPage() {
   const recruitments = await listOpenRecruitments(userId);
 
   return (
-    <main className="workspace-shell">
-      <ProjectHeader label="招募浏览" homeHref="/projects" />
-      <section className="workspace-content">
-        <div>
-          <p className="eyebrow">你好，{actor.displayName}</p>
-          <h1 className="section-title">招募中的项目</h1>
-        </div>
-        <p className="lede">
-          这里只展示企业确认过的脱敏范围与参考预算；申请与开工在后续切片提供。
-        </p>
-        {recruitments.length === 0 ? (
-          <div className="empty-state">
-            <h2>还没有已发布的项目</h2>
-            <p className="lede">企业锁定范围并完成模拟定金后，项目才会出现在这里。</p>
+    <div className="qz-paper min-h-[100svh]">
+      <ProjectHeader label="招募浏览" homeHref="/projects" fullBleed availableRoles={projectHeaderRoles(actor.roles)} />
+      <main className="qz-rise mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
+        <section aria-labelledby="recruitments-title">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="font-brand text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Open project index</p>
+              <h1 id="recruitments-title" className="mt-3 font-zh text-3xl font-normal sm:text-4xl">项目大厅</h1>
+              <p className="mt-3 font-zh text-sm text-muted-foreground">找到一个值得完成的项目</p>
+            </div>
+            <span className="font-brand text-xs text-muted-foreground">{String(recruitments.length).padStart(2, "0")} MATCHES</span>
           </div>
-        ) : (
-          <ul className="project-list">
-            {recruitments.map((recruitment) => (
-              <li key={recruitment.projectId}>
-                <Link href={`/projects/${recruitment.projectId}`}>
-                  <span>
-                    <strong>{recruitment.title}</strong>
-                    <small>{recruitment.goal}</small>
-                    <small>
-                      参考预算 {recruitment.budgetLabel} · 预计 {recruitment.deliveryDays} 个自然日 ·{" "}
-                      {recruitment.milestoneCount} 个里程碑 · 发布于{" "}
-                      {momentFormat.format(recruitment.publishedAt)}
-                    </small>
-                  </span>
-                  <span aria-hidden="true">→</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
+          <RecruitmentList recruitments={recruitments} />
+        </section>
+      </main>
+    </div>
   );
 }

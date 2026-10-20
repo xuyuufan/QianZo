@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState } from "react";
 
 import { emptyProjectActionState } from "@/app/actions/project-state";
 import { saveReferenceBudgetAction } from "@/app/actions/projects";
+import { Button } from "@/components/ui/button";
 import { DEMO_CURRENCY, formatMinorUnits, parseMinorUnits } from "@/modules/projects/money";
 
 type BudgetFormProps = {
@@ -45,11 +46,11 @@ export function BudgetForm({ projectId, version, minAmount, maxAmount }: BudgetF
       : null;
 
   return (
-    <form action={formAction} className="project-form">
+    <form action={formAction} className="mt-5 space-y-4">
       <input name="expectedVersion" type="hidden" value={version} />
-      <div className="field-row">
-        <label className="field">
-          <span>参考预算下限（{DEMO_CURRENCY}）</span>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block space-y-1.5 font-zh text-xs text-muted-foreground">
+          <span className="block">参考预算下限（{DEMO_CURRENCY}）</span>
           <input
             name="minAmount"
             type="text"
@@ -58,10 +59,11 @@ export function BudgetForm({ projectId, version, minAmount, maxAmount }: BudgetF
             onChange={(event) => setMinInput(event.target.value)}
             maxLength={20}
             required
+            className="w-full rounded-sm border border-border bg-card px-3 py-2.5 font-zh text-sm text-foreground outline-none transition-colors focus:border-foreground"
           />
         </label>
-        <label className="field">
-          <span>参考预算上限（{DEMO_CURRENCY}）</span>
+        <label className="block space-y-1.5 font-zh text-xs text-muted-foreground">
+          <span className="block">参考预算上限（{DEMO_CURRENCY}）</span>
           <input
             name="maxAmount"
             type="text"
@@ -70,12 +72,13 @@ export function BudgetForm({ projectId, version, minAmount, maxAmount }: BudgetF
             onChange={(event) => setMaxInput(event.target.value)}
             maxLength={20}
             required
+            className="w-full rounded-sm border border-border bg-card px-3 py-2.5 font-zh text-sm text-foreground outline-none transition-colors focus:border-foreground"
           />
         </label>
       </div>
       {preview && issues.length === 0 ? <p className="spec-muted">{preview}</p> : null}
       {issues.length > 0 ? (
-        <ul className="issue-list" role="alert">
+        <ul className="list-inside list-disc border border-destructive/30 px-4 py-3 font-zh text-xs text-destructive" role="alert">
           {issues.map((issue) => (
             <li key={issue}>{issue}</li>
           ))}
@@ -83,7 +86,7 @@ export function BudgetForm({ projectId, version, minAmount, maxAmount }: BudgetF
       ) : null}
       {state.message ? (
         <p
-          className={`form-message ${state.errorCode ? "error" : "success"}`}
+          className={`border px-4 py-3 font-zh text-xs ${state.errorCode ? "border-destructive/30 text-destructive" : "border-requester/30 text-foreground"}`}
           role="status"
           data-error-code={state.errorCode ?? undefined}
         >
@@ -91,9 +94,9 @@ export function BudgetForm({ projectId, version, minAmount, maxAmount }: BudgetF
         </p>
       ) : null}
       <p className="spec-muted">这是本地演示的参考金额，不是成交价，也不构成报价或合同条款。</p>
-      <button className="button" type="submit" disabled={pending || validation.issues.length > 0}>
+      <Button type="submit" size="sm" disabled={pending || validation.issues.length > 0} className="bg-foreground text-background hover:bg-foreground/90">
         {pending ? "正在保存…" : "保存参考预算"}
-      </button>
+      </Button>
     </form>
   );
 }
