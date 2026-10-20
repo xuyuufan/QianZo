@@ -134,7 +134,7 @@ beforeAll(async () => {
   const migrationFiles = readdirSync(migrationsDirectory)
     .filter((name) => name.endsWith(".sql"))
     .sort();
-  expect(migrationFiles.length).toBeGreaterThanOrEqual(9);
+  expect(migrationFiles.length).toBeGreaterThanOrEqual(10);
 
   for (const file of migrationFiles) {
     await scratch.unsafe(readFileSync(resolve(migrationsDirectory, file), "utf8"));
@@ -150,7 +150,7 @@ afterAll(async () => {
 });
 
 describeRebuild("migration chain rebuilt on an empty scratch database", () => {
-  it("creates exactly the seven business tables", async () => {
+  it("creates exactly the eight business tables needed by implemented slices", async () => {
     const tables = await scratch<{ table_name: string }[]>`
       select table_name
       from information_schema.tables
@@ -160,6 +160,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
     expect(tables.map((row) => row.table_name)).toEqual([
       "aipm_messages",
       "aipm_sessions",
+      "applications",
       "payments",
       "projects",
       "spec_versions",
@@ -168,7 +169,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
     ]);
   });
 
-  it("installs the two guard triggers and nothing else", async () => {
+  it("installs only the application, payment and project guard triggers", async () => {
     const triggers = await scratch<{ trigger_name: string }[]>`
       select trigger_name
       from information_schema.triggers
@@ -176,12 +177,13 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
       order by trigger_name
     `;
     expect(triggers.map((row) => row.trigger_name)).toEqual([
+      "applications_guard_selected",
       "payments_guard_success",
       "projects_guard_locked_scope",
     ]);
   });
 
-  it("keeps only the two project→spec_version foreign keys deferrable, and they are deferred", async () => {
+  it("keeps project pointers deferred for test cleanup", async () => {
     const constraints = await scratch<
       { conname: string; condeferrable: boolean; condeferred: boolean; confdeltype: string }[]
     >`
@@ -195,6 +197,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
     expect(deferrable.map((constraint) => constraint.conname)).toEqual([
       "projects_current_spec_version_fk",
       "projects_locked_spec_version_fk",
+      "projects_selected_application_fk",
     ]);
     for (const constraint of deferrable) {
       expect(constraint.condeferred).toBe(true);
@@ -211,7 +214,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
     }
   });
 
-  it("grants the runtime role the exact update columns on projects and payments", async () => {
+  it("grants the runtime role the exact update columns on projects, applications and payments", async () => {
     const updateColumns = async (table: string) =>
       (
         await scratch<{ column_name: string }[]>`
@@ -235,6 +238,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
       "original_requirement",
       "published_at",
       "published_spec_snapshot",
+      "selected_application_id",
       "status",
       "title",
       "updated_at",
@@ -244,6 +248,23 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
     expect(await updateColumns("projects")).not.toContain("owner_id");
 
     expect(await updateColumns("payments")).toEqual(["status", "succeeded_at", "updated_at"]);
+    expect(await updateColumns("applications")).toEqual(["status", "updated_at"]);
+    const insertColumns = await scratch<{ column_name: string }[]>`
+      select column_name
+      from information_schema.column_privileges
+      where grantee = 'qianzo_runtime'
+        and table_schema = 'app'
+        and table_name = 'applications'
+        and privilege_type = 'INSERT'
+      order by column_name
+    `;
+    expect(insertColumns.map((row) => row.column_name)).toEqual([
+      "builder_id",
+      "id",
+      "project_id",
+      "spec_version_id",
+      "statement",
+    ]);
   });
 
   it("keeps the append-only history free of runtime update, delete or insert escape hatches", async () => {

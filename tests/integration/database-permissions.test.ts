@@ -38,6 +38,7 @@ afterAll(async () => {
 const businessTables = [
   "aipm_messages",
   "aipm_sessions",
+  "applications",
   "payments",
   "projects",
   "spec_versions",
@@ -182,6 +183,14 @@ describe("application database boundary", () => {
       "insert a payment with a chosen status",
       "insert into app.payments (id, project_id, payer_id, purpose, amount_minor, currency, status) values (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'ENTERPRISE_DEPOSIT', 100, 'CNY', 'SUCCEEDED')",
     ],
+    [
+      "insert an application with a chosen status",
+      "insert into app.applications (id, project_id, builder_id, statement, spec_version_id, status) values (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), '申请', gen_random_uuid(), 'SELECTED')",
+    ],
+    [
+      "insert an application with a chosen timestamp",
+      "insert into app.applications (id, project_id, builder_id, statement, spec_version_id, created_at) values (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), '申请', gen_random_uuid(), now())",
+    ],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
   });
@@ -198,6 +207,11 @@ describe("application database boundary", () => {
         can_update_payment_amount: boolean;
         can_update_payment_payer: boolean;
         can_insert_payment_status: boolean;
+        can_update_selected_application: boolean;
+        can_update_application_status: boolean;
+        can_update_application_statement: boolean;
+        can_insert_application_status: boolean;
+        can_insert_application_builder: boolean;
       }[]
     >`
       select
@@ -209,7 +223,12 @@ describe("application database boundary", () => {
         has_column_privilege('qianzo_runtime', 'app.payments', 'status', 'UPDATE') as can_update_payment_status,
         has_column_privilege('qianzo_runtime', 'app.payments', 'amount_minor', 'UPDATE') as can_update_payment_amount,
         has_column_privilege('qianzo_runtime', 'app.payments', 'payer_id', 'UPDATE') as can_update_payment_payer,
-        has_column_privilege('qianzo_runtime', 'app.payments', 'status', 'INSERT') as can_insert_payment_status
+        has_column_privilege('qianzo_runtime', 'app.payments', 'status', 'INSERT') as can_insert_payment_status,
+        has_column_privilege('qianzo_runtime', 'app.projects', 'selected_application_id', 'UPDATE') as can_update_selected_application,
+        has_column_privilege('qianzo_runtime', 'app.applications', 'status', 'UPDATE') as can_update_application_status,
+        has_column_privilege('qianzo_runtime', 'app.applications', 'statement', 'UPDATE') as can_update_application_statement,
+        has_column_privilege('qianzo_runtime', 'app.applications', 'status', 'INSERT') as can_insert_application_status,
+        has_column_privilege('qianzo_runtime', 'app.applications', 'builder_id', 'INSERT') as can_insert_application_builder
     `;
 
     expect(privileges).toEqual({
@@ -223,6 +242,11 @@ describe("application database boundary", () => {
       can_update_payment_amount: false,
       can_update_payment_payer: false,
       can_insert_payment_status: false,
+      can_update_selected_application: true,
+      can_update_application_status: true,
+      can_update_application_statement: false,
+      can_insert_application_status: false,
+      can_insert_application_builder: true,
     });
   });
 

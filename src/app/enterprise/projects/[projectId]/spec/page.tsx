@@ -91,7 +91,7 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
             </p>
           </div>
           <div className="grid shrink-0 grid-cols-3 gap-4 font-zh text-xs sm:gap-6 sm:text-right">
-            <span><b className="mb-1 block font-normal text-muted-foreground">项目</b>{project.status === "OPEN" ? "招募中" : "草稿"}</span>
+            <span><b className="mb-1 block font-normal text-muted-foreground">项目</b>{project.status === "AWAITING_BUILDER" ? "等待 Builder Mock 押金" : project.status === "OPEN" ? "招募中" : "草稿"}</span>
             <span><b className="mb-1 block font-normal text-muted-foreground">Spec</b>{current ? `当前 Spec 版本 ${current.versionNo}` : "未保存"}</span>
             <span><b className="mb-1 block font-normal text-muted-foreground">范围</b>{locked ? "已锁定" : "编辑中"}</span>
           </div>

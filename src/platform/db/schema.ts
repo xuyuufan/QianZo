@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -10,6 +11,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -70,6 +72,7 @@ export const projects = appSchema.table(
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     publishedSpecSnapshot: jsonb("published_spec_snapshot"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    selectedApplicationId: uuid("selected_application_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -86,7 +89,7 @@ export const projects = appSchema.table(
       "projects_original_requirement_check",
       sql`char_length(${table.originalRequirement}) between 0 and 10000`,
     ),
-    check("projects_status_check", sql`${table.status} in ('DRAFT', 'OPEN')`),
+    check("projects_status_check", sql`${table.status} in ('DRAFT', 'OPEN', 'AWAITING_BUILDER')`),
     check("projects_version_check", sql`${table.version} > 0`),
     index("projects_owner_created_at_idx").on(table.ownerId, table.createdAt.desc()),
   ],
@@ -160,6 +163,44 @@ export const specVersions = appSchema.table(
   ],
 );
 
+export const applications = appSchema.table(
+  "applications",
+  {
+    id: uuid("id").primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "restrict" }),
+    builderId: uuid("builder_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    statement: text("statement").notNull(),
+    status: text("status").notNull().default("SUBMITTED"),
+    specVersionId: uuid("spec_version_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("applications_project_builder_unique").on(table.projectId, table.builderId),
+    unique("applications_project_id_unique").on(table.projectId, table.id),
+    foreignKey({
+      name: "applications_spec_version_fk",
+      columns: [table.projectId, table.specVersionId],
+      foreignColumns: [specVersions.projectId, specVersions.id],
+    }).onDelete("restrict"),
+    check(
+      "applications_statement_check",
+      sql`char_length(${table.statement}) between 1 and 2000 and ${table.statement} = btrim(${table.statement}) and ${table.statement} ~ '[^[:space:]]'`,
+    ),
+    check(
+      "applications_status_check",
+      sql`${table.status} in ('SUBMITTED', 'SELECTED', 'ENGAGED', 'REJECTED')`,
+    ),
+    uniqueIndex("applications_one_selected_per_project_unique")
+      .on(table.projectId)
+      .where(sql`${table.status} in ('SELECTED', 'ENGAGED')`),
+  ],
+);
+
 export const payments = appSchema.table(
   "payments",
   {
@@ -199,3 +240,4 @@ export type UserStatus = "ACTIVE" | "DISABLED";
 export type AipmMessageRole = "USER" | "ASSISTANT";
 export type PaymentStatus = "PENDING" | "SUCCEEDED";
 export type PaymentPurpose = "ENTERPRISE_DEPOSIT";
+export type ApplicationStatus = "SUBMITTED" | "SELECTED" | "ENGAGED" | "REJECTED";

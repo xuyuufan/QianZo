@@ -1,0 +1,183 @@
+import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
+
+import { createClient } from "@supabase/supabase-js";
+import { expect, test, type Page } from "@playwright/test";
+import postgres from "postgres";
+
+import { clearDemoBusinessData } from "../helpers/demo-data";
+import {
+  loadLocalEnv,
+  requireLoopbackApiUrl,
+  requireLoopbackDatabaseUrl,
+} from "../helpers/local-env";
+import { validSpecDocument } from "../helpers/spec-fixture";
+
+const { tools, app } = loadLocalEnv(resolve(process.cwd()));
+if (!tools.DEMO_USER_PASSWORD || !tools.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("Run pnpm db:prepare before the applications E2E test.");
+}
+
+const authAdmin = createClient(
+  requireLoopbackApiUrl(app.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL"),
+  tools.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } },
+);
+const adminSql = postgres(requireLoopbackDatabaseUrl(tools.SUPABASE_DB_ADMIN_URL, "SUPABASE_DB_ADMIN_URL"), {
+  max: 1,
+  prepare: false,
+});
+const runId = Date.now();
+const emails = {
+  enterprise: `s2-enterprise-${runId}@qianzo.test`,
+  otherEnterprise: `s2-other-enterprise-${runId}@qianzo.test`,
+  builder: `s2-builder-${runId}@qianzo.test`,
+  otherBuilder: `s2-other-builder-${runId}@qianzo.test`,
+};
+let userIds: string[] = [];
+let projectId: string;
+
+async function createAuthUser(email: string) {
+  const { data, error } = await authAdmin.auth.admin.createUser({
+    email,
+    password: tools.DEMO_USER_PASSWORD!,
+    email_confirm: true,
+  });
+  if (error) throw error;
+  return data.user.id;
+}
+
+async function login(page: Page, email: string, intent: "requester" | "builder") {
+  await page.goto(`/sign-in?intent=${intent}`);
+  await page.getByLabel("邮箱").fill(email);
+  await page.getByLabel("密码").fill(tools.DEMO_USER_PASSWORD!);
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
+}
+
+test.beforeAll(async () => {
+  userIds = await Promise.all(Object.values(emails).map(createAuthUser));
+  await clearDemoBusinessData(adminSql, userIds);
+  const roleRows = [
+    [userIds[0], "S2 E2E 企业", "ENTERPRISE"],
+    [userIds[1], "S2 E2E 其他企业", "ENTERPRISE"],
+    [userIds[2], "S2 E2E Builder", "BUILDER"],
+    [userIds[3], "S2 E2E 其他 Builder", "BUILDER"],
+  ] as const;
+  for (const [userId, displayName, role] of roleRows) {
+    await adminSql`insert into app.users (id, display_name) values (${userId}, ${displayName})`;
+    await adminSql`insert into app.user_roles (user_id, role) values (${userId}, ${role})`;
+  }
+
+  projectId = randomUUID();
+  const specVersionId = randomUUID();
+  const document = validSpecDocument();
+  const snapshot = {
+    schemaVersion: 1,
+    lockedSpecVersionId: specVersionId,
+    title: "S2 公开申请项目",
+    budget: { minMinor: 100000, maxMinor: 250000, currency: "CNY" },
+    document,
+  };
+  await adminSql.begin(async (transaction) => {
+    await transaction`insert into app.projects (id, owner_id, title, original_requirement)
+      values (${projectId}, ${userIds[0]}, 'PRIVATE-S2 合成项目', 'PRIVATE-S2 原始需求不应展示给申请人。')`;
+    await transaction`insert into app.spec_versions (id, project_id, version_no, schema_version, content, created_by)
+      values (${specVersionId}, ${projectId}, 1, 1, ${transaction.json(document)}, ${userIds[0]})`;
+    await transaction`update app.projects
+      set current_spec_version_id = ${specVersionId},
+          budget_min_minor = 100000,
+          budget_max_minor = 250000,
+          currency = 'CNY',
+          locked_spec_version_id = ${specVersionId},
+          locked_at = now(),
+          status = 'OPEN',
+          published_spec_snapshot = ${transaction.json(snapshot)},
+          published_at = now(),
+          version = 4
+      where id = ${projectId}`;
+  });
+});
+
+test.afterAll(async () => {
+  if (userIds.length) {
+    await clearDemoBusinessData(adminSql, userIds);
+    await adminSql`delete from app.user_roles where user_id in ${adminSql(userIds)}`;
+    await adminSql`delete from app.users where id in ${adminSql(userIds)}`;
+    for (const userId of userIds) {
+      const { error } = await authAdmin.auth.admin.deleteUser(userId);
+      if (error) throw error;
+    }
+  }
+  await adminSql.end();
+});
+
+test("a Builder applies, the project owner selects them, and private application data stays scoped", async ({
+  browser,
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const statement = "I have shipped similar workflow tools and can deliver the core flow.";
+  const otherBuilderPage = await browser.newPage();
+  const otherEnterprisePage = await browser.newPage();
+  const enterprisePage = await browser.newPage();
+
+  try {
+    await login(page, emails.builder, "builder");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/projects/${projectId}`);
+    await expect(page.getByRole("heading", { name: "S2 公开申请项目" })).toBeVisible();
+    await expect(page.getByLabel("简要介绍你适合这个项目的经验")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+      await page.evaluate(() => document.documentElement.clientWidth),
+    );
+    await page.getByLabel("简要介绍你适合这个项目的经验").fill(statement);
+    await page.getByRole("button", { name: "提交申请" }).click();
+    await expect(page.getByRole("status")).toContainText("你已提交申请");
+    await expect(page.getByRole("status").getByRole("link", { name: "查看我的申请" })).toBeVisible();
+    await page.goto("/builder/applications");
+    await expect(page.getByRole("heading", { name: "S2 公开申请项目" })).toBeVisible();
+    await expect(page.getByText(statement)).toBeVisible();
+    await expect(page.getByTestId("application-status")).toHaveText("等待企业选择");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+      await page.evaluate(() => document.documentElement.clientWidth),
+    );
+
+    await login(otherBuilderPage, emails.otherBuilder, "builder");
+    await otherBuilderPage.goto("/builder/applications");
+    await expect(otherBuilderPage.getByText("还没有提交申请。")).toBeVisible();
+    await otherBuilderPage.goto(`/projects/${projectId}`);
+    await expect(otherBuilderPage.getByText(statement)).toHaveCount(0);
+    await expect(otherBuilderPage.getByText("PRIVATE-S2 原始需求")).toHaveCount(0);
+
+    await login(otherEnterprisePage, emails.otherEnterprise, "requester");
+    const hiddenResponse = await otherEnterprisePage.goto(
+      `/enterprise/projects/${projectId}/applications`,
+    );
+    expect(hiddenResponse?.status()).toBe(404);
+    await expect(otherEnterprisePage.getByText(statement)).toHaveCount(0);
+
+    await login(enterprisePage, emails.enterprise, "requester");
+    await enterprisePage.goto(`/enterprise/projects/${projectId}`);
+    await enterprisePage.getByRole("link", { name: "查看申请", exact: true }).click();
+    await expect(enterprisePage).toHaveURL(new RegExp(`/enterprise/projects/${projectId}/applications$`));
+    await expect(enterprisePage.getByText("S2 E2E Builder")).toBeVisible();
+    await expect(enterprisePage.getByText(statement)).toBeVisible();
+    await enterprisePage.getByRole("button", { name: "选择 Builder" }).click();
+    await expect(enterprisePage.getByRole("status")).toContainText("等待其完成 Mock 押金");
+    await expect(enterprisePage.getByTestId("application-status")).toHaveText("已选择");
+
+    await page.reload();
+    await expect(page.getByTestId("application-status")).toHaveText("已被选择 · 等待 Mock 押金");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+      await page.evaluate(() => document.documentElement.clientWidth),
+    );
+    await expect(page.getByRole("button", { name: /押金|开工/ })).toHaveCount(0);
+  } finally {
+    await Promise.all([
+      otherBuilderPage.close(),
+      otherEnterprisePage.close(),
+      enterprisePage.close(),
+    ]);
+  }
+});

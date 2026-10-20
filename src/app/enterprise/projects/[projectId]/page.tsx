@@ -71,9 +71,17 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const depositSucceeded = paymentState?.payment?.status === "SUCCEEDED";
   const budget = describeBudget(project.budgetMinMinor, project.budgetMaxMinor, project.currency);
   const currency = project.currency ?? DEMO_CURRENCY;
-  const statusLabel = project.status === "OPEN" ? "招募中" : locked ? "范围已锁定" : "草稿";
-  const stageLabel = project.status === "OPEN"
-    ? "招募已开放"
+  const statusLabel = project.status === "AWAITING_BUILDER"
+    ? "等待 Builder Mock 押金"
+    : project.status === "OPEN"
+      ? "招募中"
+      : locked
+        ? "范围已锁定"
+        : "草稿";
+  const stageLabel = project.status === "AWAITING_BUILDER"
+    ? "已选择 Builder，等待 Mock 押金；尚未开工"
+    : project.status === "OPEN"
+      ? "招募已开放"
     : locked
       ? depositSucceeded
         ? "范围已确认，模拟定金已完成，等待发布"
@@ -81,13 +89,17 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       : history.current
         ? "Spec 已保存，待确认范围"
         : "需求待整理";
-  const primaryHref = project.status === "OPEN"
-    ? `/projects/${project.id}`
+  const primaryHref = project.status === "AWAITING_BUILDER"
+    ? `/enterprise/projects/${project.id}/applications`
+    : project.status === "OPEN"
+      ? `/projects/${project.id}`
     : locked
       ? `/enterprise/projects/${project.id}/publish`
       : `/enterprise/projects/${project.id}/spec`;
-  const primaryLabel = project.status === "OPEN"
-    ? "查看招募页"
+  const primaryLabel = project.status === "AWAITING_BUILDER"
+    ? "查看申请与已选 Builder"
+    : project.status === "OPEN"
+      ? "查看招募页"
     : locked
       ? "Mock 定金与发布"
       : "需求访谈与 Spec";
@@ -123,6 +135,11 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             <Button asChild size="sm" className="bg-foreground text-background hover:bg-foreground/90">
               <Link href={primaryHref}>{primaryLabel}<ArrowRight className="ml-1 size-3.5" strokeWidth={1.5} /></Link>
             </Button>
+            {project.status === "OPEN" ? (
+              <Button asChild variant="outline" size="sm" className="font-zh text-xs">
+                <Link href={`/enterprise/projects/${project.id}/applications`}>查看申请</Link>
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -143,6 +160,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             <OverviewPanel
               project={{ id: project.id, title: project.title, originalRequirement: project.originalRequirement, version: project.version }}
               requesterName={actor.displayName}
+              builderLabel={project.status === "AWAITING_BUILDER" ? "已选定，等待 Mock 押金" : "尚未承接"}
               stageLabel={stageLabel}
               locked={locked}
               budget={budget}
@@ -195,6 +213,7 @@ function MilestoneAxis({ document }: { document: SpecDocumentV1 | null }) {
 function OverviewPanel({
   project,
   requesterName,
+  builderLabel,
   stageLabel,
   locked,
   budget,
@@ -204,6 +223,7 @@ function OverviewPanel({
 }: {
   project: { id: string; title: string; originalRequirement: string; version: number };
   requesterName: string;
+  builderLabel: string;
   stageLabel: string;
   locked: boolean;
   budget: string | null;
@@ -215,7 +235,7 @@ function OverviewPanel({
     <div className="space-y-8">
       <div className="grid gap-px border border-border bg-border md:grid-cols-3">
         <SummaryCell label="需求方" value={requesterName} />
-        <SummaryCell label="开发者" value="尚未承接" />
+        <SummaryCell label="开发者" value={builderLabel} />
         <SummaryCell label="当前阶段" value={stageLabel} />
       </div>
 

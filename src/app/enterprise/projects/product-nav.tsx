@@ -15,10 +15,14 @@ export function ProductNav({ role }: { role: Role }) {
 
   if (role === "builder") {
     const active = pathname.startsWith("/projects");
+    const applicationsActive = pathname.startsWith("/builder/applications");
     return (
-      <nav className="flex h-14 items-stretch gap-5 font-zh text-xs" aria-label="开发者导航">
-        <Link href="/projects" className={linkClass(active)} aria-current={active ? "page" : undefined}>
+      <nav className="flex h-14 items-stretch gap-3 font-zh text-[11px] sm:gap-5 sm:text-xs" aria-label="开发者导航">
+        <Link href="/projects" className={linkClass(active && !applicationsActive)} aria-current={active && !applicationsActive ? "page" : undefined}>
           项目大厅
+        </Link>
+        <Link href="/builder/applications" className={linkClass(applicationsActive)} aria-current={applicationsActive ? "page" : undefined}>
+          我的申请
         </Link>
       </nav>
     );

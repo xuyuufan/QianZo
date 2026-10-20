@@ -44,12 +44,12 @@ export default async function EnterpriseProjectsPage({
   const counts: Record<ProjectFilter, number> = {
     all: projectList.length,
     draft: projectList.filter((project) => project.status === "DRAFT").length,
-    open: projectList.filter((project) => project.status === "OPEN").length,
+    open: projectList.filter((project) => project.status === "OPEN" || project.status === "AWAITING_BUILDER").length,
   };
   const visibleProjects = projectList.filter((project) =>
     selectedFilter === "all"
     || (selectedFilter === "draft" && project.status === "DRAFT")
-    || (selectedFilter === "open" && project.status === "OPEN"),
+    || (selectedFilter === "open" && (project.status === "OPEN" || project.status === "AWAITING_BUILDER")),
   );
 
   return (
@@ -105,7 +105,8 @@ export default async function EnterpriseProjectsPage({
             <ul className="divide-y divide-border border-b border-border">
               {visibleProjects.map((project) => {
                 const isOpen = project.status === "OPEN";
-                const specHint = isOpen
+                const isAwaitingBuilder = project.status === "AWAITING_BUILDER";
+                const specHint = isOpen || isAwaitingBuilder
                   ? "Spec 已确认"
                   : project.currentSpecVersionId
                     ? "Spec 已有版本"
@@ -121,8 +122,8 @@ export default async function EnterpriseProjectsPage({
                         <span className="mt-1 block truncate font-zh text-xs text-muted-foreground">{project.originalRequirement}</span>
                       </span>
                       <span className="flex items-center gap-2 font-zh text-xs text-muted-foreground">
-                        <span className={`size-1.5 rounded-full ${isOpen ? "bg-requester" : "bg-border"}`} />
-                        {isOpen ? "等待开发者" : "草稿"}
+                        <span className={`size-1.5 rounded-full ${isOpen || isAwaitingBuilder ? "bg-requester" : "bg-border"}`} />
+                        {isAwaitingBuilder ? "等待 Builder Mock 押金" : isOpen ? "等待开发者" : "草稿"}
                       </span>
                       <span className="hidden font-zh text-xs text-muted-foreground sm:block">{specHint}</span>
                       <span className="hidden text-right font-zh text-xs text-muted-foreground sm:block">{formatUpdatedAt(project.updatedAt)}</span>

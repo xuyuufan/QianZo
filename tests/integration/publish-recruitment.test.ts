@@ -143,7 +143,7 @@ beforeAll(async () => {
 
   enterpriseA = await completeOnboardingWithDatabase(database, userIds[0], {
     displayName: "发布测试企业 A",
-    roles: ["ENTERPRISE"],
+    roles: ["ENTERPRISE", "BUILDER"],
   });
   enterpriseB = await completeOnboardingWithDatabase(database, userIds[1], {
     displayName: "发布测试企业 B",
@@ -552,6 +552,7 @@ describe("recruitment view", () => {
     const detail = await getOpenRecruitmentWithDatabase(database, builder, fixture.project.id);
     expect(Object.keys(detail ?? {}).sort()).toEqual([
       "budgetLabel",
+      "canApply",
       "deliveryDays",
       "document",
       "projectId",
@@ -561,6 +562,21 @@ describe("recruitment view", () => {
     expect(detail?.document.milestones).toHaveLength(2);
     expect(detail?.budgetLabel).toBe("¥1000.00 – ¥2500.50");
     expect(detail?.deliveryDays).toBe(24);
+    expect(detail?.canApply).toBe(true);
+
+    const ownerDualRoleDetail = await getOpenRecruitmentWithDatabase(
+      database,
+      enterpriseA,
+      fixture.project.id,
+    );
+    expect(ownerDualRoleDetail?.canApply).toBe(false);
+
+    const enterpriseOnlyDetail = await getOpenRecruitmentWithDatabase(
+      database,
+      enterpriseB,
+      fixture.project.id,
+    );
+    expect(enterpriseOnlyDetail?.canApply).toBe(false);
 
     // Private projects and drafts read as absent for everyone.
     expect(await getOpenRecruitmentWithDatabase(database, builder, draft.project.id)).toBeNull();
@@ -577,12 +593,14 @@ describe("recruitment view", () => {
     expect(readByOtherEnterprise?.title).toBe("已脱敏的招募标题");
 
     // Nothing private leaks through the DTOs.
-    const serialized = JSON.stringify({ listed, detail });
+    const serialized = JSON.stringify({ listed, detail, ownerDualRoleDetail, enterpriseOnlyDetail });
     expect(serialized).not.toContain("ZZSECRET");
     expect(serialized).not.toContain(secretRequirement);
     expect(serialized).not.toContain("qianzo.test");
     expect(serialized).not.toContain("originalRequirement");
     expect(serialized).not.toContain("lockedSpecVersionId");
+    expect(serialized).not.toContain("ownerId");
+    expect(serialized).not.toContain("rawSpec");
   });
 
   it("refuses a disabled account", async () => {

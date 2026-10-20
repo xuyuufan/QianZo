@@ -3,11 +3,13 @@ import { notFound, redirect } from "next/navigation";
 
 import { SpecDocumentView } from "@/components/spec-document-view";
 import { getActorById } from "@/modules/identity/service";
+import { getOwnApplicationForProject } from "@/modules/applications/service";
 import { projectIdSchema } from "@/modules/projects/validation";
 import { getOpenRecruitment } from "@/modules/recruitment/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
 import { ProjectHeader, projectHeaderRoles } from "../../enterprise/projects/project-header";
+import { ApplicationForm } from "./application-form";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,9 @@ export default async function RecruitmentDetailPage({ params }: RecruitmentPageP
   // A draft, a locked-but-unpublished or a missing project all read as absent.
   const recruitment = await getOpenRecruitment(userId, parsedId.data);
   if (!recruitment) notFound();
+  const ownApplication = recruitment.canApply
+    ? await getOwnApplicationForProject(userId, parsedId.data)
+    : null;
 
   return (
     <main className="qz-paper min-h-[100svh]">
@@ -74,9 +79,25 @@ export default async function RecruitmentDetailPage({ params }: RecruitmentPageP
           <SpecDocumentView document={recruitment.document} showIds={false} />
         </section>
 
-        <p className="mt-10 border-t border-border pt-5 font-zh text-xs leading-5 text-muted-foreground">
-          申请、选择与开工在后续切片提供；本页只提供申请前的评估信息，不含企业私有对话、原始需求与付款明细。
-        </p>
+        {actor.roles.includes("BUILDER") ? (
+          <section className="mt-10 border-t border-border pt-7" aria-labelledby="apply-title">
+            <p className="font-brand text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Builder application</p>
+            <h2 id="apply-title" className="mt-2 font-zh text-xl font-normal">申请这个项目</h2>
+            <p className="mt-2 font-zh text-xs leading-5 text-muted-foreground">介绍与你相关的经验，并说明你会如何推进项目。</p>
+            {actor.roles.includes("BUILDER") && !recruitment.canApply ? (
+              <p className="mt-5 font-zh text-sm text-muted-foreground" role="status">项目负责人不能申请自己负责的项目。</p>
+            ) : ownApplication ? (
+              <p className="mt-5 font-zh text-sm" role="status">
+                你已提交申请（{ownApplication.status === "SELECTED" ? "已被选择" : "等待企业选择"}）。
+                <Link href="/builder/applications" className="ml-2 underline underline-offset-4">查看我的申请</Link>
+              </p>
+            ) : recruitment.canApply ? <ApplicationForm projectId={recruitment.projectId} /> : null}
+          </section>
+        ) : (
+          <p className="mt-10 border-t border-border pt-5 font-zh text-xs leading-5 text-muted-foreground">
+            申请由 Builder 身份提交；本页只提供脱敏评估信息，不含企业私有对话、原始需求与付款明细。
+          </p>
+        )}
       </section>
     </main>
   );

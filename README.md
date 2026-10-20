@@ -1,6 +1,6 @@
 # Qianzo
 
-Qianzo 当前完成了 S0 与 S1：企业通过真实 Supabase Auth 登录后可以创建项目草稿，用 Mock AIPM 访谈生成候选 Spec，审核保存并锁定范围，填写参考预算、完成模拟企业定金，确认脱敏预览后发布。已发布项目对任何登录用户可见可评估。企业间资源隔离、Builder 角色拒绝、并发冲突、锁定不可改写、定金只生效一次、发布原子性与脱敏边界都在服务端和真实 PostgreSQL 上验证。[S1 施工规格](docs/slices/S1-spec-publish/README.md) 已实施，状态与验证证据见 [PROJECT_STATUS](docs/PROJECT_STATUS.md)。
+Qianzo 已完成 S0、S1 与 S2-01 的实现、本地验收和主模型审核；S2-02 Builder 押金与开工尚未开始。S1 招募快照只对已发布 OPEN 项目公开，申请经真实 Supabase Auth、服务端业务规则和 PostgreSQL 约束处理。切片范围见 [S1 施工规格](docs/slices/S1-spec-publish/README.md) 与 [S2 当前施工计划](docs/slices/S2-applications-workspace/README.md)，状态和验证证据见 [PROJECT_STATUS](docs/PROJECT_STATUS.md)。
 
 ## 本机要求
 
@@ -128,13 +128,13 @@ corepack pnpm demo:seed
 
 ## 当前边界
 
-- S1 累计 7 张业务表：`app.users`、`app.user_roles`、`app.projects`、`app.aipm_sessions`、`app.aipm_messages`、`app.spec_versions`、`app.payments`。
+- S2-01 当前增加 `app.applications` 与项目选中申请指针，业务表共 8 张；字段、约束和权限见 [S2 README](docs/slices/S2-applications-workspace/README.md)。
 - 资源隔离由每个服务端入口执行；当前没有用户级 RLS，且不会宣称已有该隔离层。
-- 链路到「项目 OPEN、其他登录用户可评估」为止，不是完整交易闭环：申请、选择、Builder Mock 押金与开工尚未开始。
+- 本地实现目前贯通至企业选择 Builder、项目进入 `AWAITING_BUILDER`；Builder Mock 押金、开工、Milestone 初始化与 Workspace 尚未实现，因此整体仍不是完整交易闭环。
 - S1 不提供解锁、下架、重新发布或修改已公开内容；已发布快照、锁定范围与 Spec 历史均不可改写。
 - 尚未实现真实 AIPM、真实支付、Workspace、文件上传、通知、管理员界面或生产部署。
 - 演示账号与本地数据库只用于合成开发数据，不代表企业认证、合同接受或真实交易；模拟定金不代表真实收付。
-- 下一施工项是 S2，开工需要新的明确授权。
+- 当前施工项是 S2-01；其完整验收后再按计划进入 S2-02。
 
 ## 权威文档
 
@@ -143,4 +143,5 @@ corepack pnpm demo:seed
 - [施工切片](docs/BUILD_SLICES.md)
 - [S0 施工规格](docs/slices/S0-project-draft/README.md)
 - [S1 施工规划：需求变成可招募项目](docs/slices/S1-spec-publish/README.md)
+- [S2 当前施工计划：申请与企业选择](docs/slices/S2-applications-workspace/README.md)
 - [当前项目状态](docs/PROJECT_STATUS.md)

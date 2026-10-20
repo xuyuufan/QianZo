@@ -1,14 +1,18 @@
 # Qianzo 项目状态
 
-更新时间：2026-10-20（PR #2 已合并；PR #3 新复审修复与最终验证通过，主模型审查 PASS）
+更新时间：2026-10-20（S2-01 主模型审核 PASS，本地已提交）
 
-当前分支：`codex/s1-review-closeout`，PR #3 已审核衔接基线 `42e692a84d5e517d2e500c823ac0d4a713ed2005` 的 tree 与 UI HEAD `8989517` 相同，并已同步到 `feat/lovable-ui-parity`。本次延迟角色导航修复、E2E 回归与文档更新已通过主审和最终验证；接下来按已授权流程更新现有 PR #3 并合并。
+当前分支：`codex/s2-applications`，从已同步的 `main` 基线 `185fd06d99a8de092963bd94b22dd38e5668a6bc` 创建。PR #2/#3 已合并；S2-01 已通过主模型审核并本地提交，尚未推送。
 
-远端状态（本次本地提交前）：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) 已于 2026-10-15 squash 合并，merge commit 为 `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) 为 OPEN，base=`main`，远端 head=`42e692a84d5e517d2e500c823ac0d4a713ed2005`。主模型于 2026-10-20 发现第 4 条未解决 UI 评审意见；本地修复、最终验证和主审均已通过，接下来按已授权流程更新现有 PR 并合并。
+远端基线：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) merge commit `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) merge commit `185fd06d99a8de092963bd94b22dd38e5668a6bc`。合并后的 main tree 为 `a62f4dd3907513faead7a42039ecbce4a96aac36`，与 PR #3 最终修复 head `126848a` 的 tree 相同；本次复核 `git diff --exit-code 126848a origin/main` 返回 0。
 
-当前 Slice：S1「需求变成可招募项目」已完成并合入 `main`；PR #3 的 UI 基线修复已通过本地主审与验证，等待按授权流程合并。S2 尚未开始；待 PR #3 合并、在最新 `main` 复验后再开始 S2。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、可见性等 PPD 仍为 Pending。
+当前 Slice：S2-01「Builder 申请与企业选择」实现、验收和主模型审核均已通过；S2-02 Builder Mock 押金、开工与 Workspace 尚未开始。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、Spec 可见性等 PPD 仍为 Pending。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
+
+## S2-01 当前实施（2026-10-20）
+
+已新增 S2 README、`applications` migration、服务端申请/选择与白名单 DTO、Builder「我的申请」和企业申请列表入口，并将 `db:prepare` 应用于本地数据库（未执行 `db:reset`）。`typecheck`、`lint`、12 个文件的 100/100 unit、串行 10 个文件的 122/122 integration，以及生产构建上的 17/17 E2E 均通过。构建生成 12 个产品路由（Next app-paths manifest 共 14 项，另含 2 个内部错误路由）。完整 E2E 日志与退出码保存在忽略目录 `artifacts/ui-parity/s2/verification-20261020/`。S2-01 已通过主模型审核并完成本地提交；S2-02 尚未开始。
 
 ## PR #2 / PR #3 基线衔接（2026-10-15）
 
@@ -173,14 +177,14 @@ S1-06 的验收与文档提交见 `eb38dc6`。
 - **当时待拍板、现已落地**：UI 技术栈。存档文档推荐 Tailwind v4 + shadcn/ui（本项目 RSC/client 边界早已落在 11 个表单上，故组件库的边际客户端渗透为零），回退方案为纯 CSS Modules；MUI 会把全局导航壳推向客户端、并有诱发取数下沉的风险；Ant Design 因 `<Form>` 自管字段、不写入原生 `FormData`，会直接打断 `formData.get` 契约，已排除。
 - 本节为历史评估记录：其「未开工 / 待拍板」状态随后由 2026-09-25 的 UI 接入完成——技术栈最终采用 Tailwind v4 + Radix Slot + CVA，且 `src/modules/**`、`src/platform/**` 与 migration 均未改动，见下节「Qianzo Flow UI 接入」。
 
-## 已知限制与交接
+## 已知限制与交接（更新至 2026-10-20）
 
 - 当前是本地合成数据演示，不是生产部署；没有 CI、备份、生产监控或用户级 RLS。
-- S1 到达「项目已 OPEN、其他登录用户可评估」为止，**不是完整交易闭环**：申请、选择、Builder 押金与开工均未开始（S2）。
+- S2-01 已实现 Builder 申请与企业选择，项目选择后进入 `AWAITING_BUILDER`；整体仍**不是完整交易闭环**，Builder 押金、开工和 Workspace 尚未开始（S2-02）。
 - S1 不提供解锁、下架、重新发布或修改已公开内容；已发布快照、锁定范围与 Spec 历史都不可改写。
 - Mock 定金与 Mock AIPM 都不代表真实收付、真实模型或合同接受；演示金额为固定 fixture，不是已确定的定金标准。
 - Spec 可见性细则、报价能力、价格模式与选择后二次接受仍是 Pending Product Decisions。
-- 下一 Slice 是 S2；开工需要新的明确授权，不要自行开始。
+- 下一任务是 S2-02，仍按独立 PLAN → EXECUTE → REVIEW 流程实施和验收。
 
 ---
 
