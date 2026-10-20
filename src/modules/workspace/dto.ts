@@ -13,6 +13,7 @@ export type WorkspaceMilestoneDTO = {
 
 export type WorkspaceDTO = {
   projectId: string;
+  viewerRole: "owner" | "builder";
   title: string;
   startedAt: string;
   milestones: WorkspaceMilestoneDTO[];

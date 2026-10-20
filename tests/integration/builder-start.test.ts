@@ -146,7 +146,7 @@ beforeAll(async () => {
   });
   builderA = await completeOnboardingWithDatabase(database, userIds[2], {
     displayName: "开工测试 Builder A",
-    roles: ["BUILDER"],
+    roles: ["BUILDER", "ENTERPRISE"],
   });
   builderB = await completeOnboardingWithDatabase(database, userIds[3], {
     displayName: "开工测试 Builder B",
@@ -271,6 +271,7 @@ describe("Builder Mock deposit and atomic project start", () => {
     expect(workspace).not.toBeNull();
     expect(workspace).toMatchObject({
       projectId: project.id,
+      viewerRole: "builder",
       title: "公开开工项目",
       milestones: [
         {
@@ -283,7 +284,9 @@ describe("Builder Mock deposit and atomic project start", () => {
         { position: 2, title: document.milestones[1].title, status: "PENDING" },
       ],
     });
-    expect(await getWorkspaceWithDatabase(database, enterpriseA, project.id)).toEqual(workspace);
+    if (!workspace) throw new Error("Expected the engaged Builder to read the Workspace.");
+    const ownerWorkspace = await getWorkspaceWithDatabase(database, enterpriseA, project.id);
+    expect(ownerWorkspace).toEqual({ ...workspace, viewerRole: "owner" });
     expect(await getWorkspaceWithDatabase(database, enterpriseB, project.id)).toBeNull();
     expect(await getWorkspaceWithDatabase(database, builderB, project.id)).toBeNull();
     const serializedWorkspace = JSON.stringify(workspace);

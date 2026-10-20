@@ -59,14 +59,16 @@ test.beforeAll(async () => {
   userIds = await Promise.all(Object.values(emails).map(createAuthUser));
   await clearDemoBusinessData(adminSql, userIds);
   const roleRows = [
-    [userIds[0], "S2 E2E 企业", "ENTERPRISE"],
-    [userIds[1], "S2 E2E 其他企业", "ENTERPRISE"],
-    [userIds[2], "S2 E2E Builder", "BUILDER"],
-    [userIds[3], "S2 E2E 其他 Builder", "BUILDER"],
+    [userIds[0], "S2 E2E 企业", ["ENTERPRISE", "BUILDER"]],
+    [userIds[1], "S2 E2E 其他企业", ["ENTERPRISE"]],
+    [userIds[2], "S2 E2E Builder", ["BUILDER", "ENTERPRISE"]],
+    [userIds[3], "S2 E2E 其他 Builder", ["BUILDER"]],
   ] as const;
-  for (const [userId, displayName, role] of roleRows) {
+  for (const [userId, displayName, roles] of roleRows) {
     await adminSql`insert into app.users (id, display_name) values (${userId}, ${displayName})`;
-    await adminSql`insert into app.user_roles (user_id, role) values (${userId}, ${role})`;
+    for (const role of roles) {
+      await adminSql`insert into app.user_roles (user_id, role) values (${userId}, ${role})`;
+    }
   }
 
   projectId = randomUUID();
@@ -190,6 +192,9 @@ test("a Builder applies, the project owner selects them, and private application
     await builderWorkspaceLink.click();
     await expect(page.getByRole("heading", { name: "S2 公开申请项目" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "项目里程碑" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "开发者导航" })).toBeVisible();
+    const builderReturnLink = page.getByRole("link", { name: "返回我的申请" });
+    await expect(builderReturnLink).toHaveAttribute("href", "/builder/applications");
     await expect(page.getByText(/PRIVATE-S2 原始需求/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: /提交成果|验收/ })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
@@ -197,11 +202,22 @@ test("a Builder applies, the project owner selects them, and private application
     );
     await page.reload();
     await expect(page.getByRole("heading", { name: "项目里程碑" })).toBeVisible();
+    await builderReturnLink.click();
+    await expect(page).toHaveURL("/builder/applications");
+    await expect(page.getByRole("heading", { name: "我的申请" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "进入 Workspace →" })).toBeVisible();
+    await page.getByRole("link", { name: "进入 Workspace →" }).click();
+    await expect(page.getByRole("heading", { name: "项目里程碑" })).toBeVisible();
 
     await enterprisePage.goto(`/enterprise/projects/${projectId}/applications`);
     await expect(enterprisePage.getByRole("status")).toContainText("项目已开工");
     await enterprisePage.getByRole("link", { name: "进入 Workspace →" }).click();
     await expect(enterprisePage.getByRole("heading", { name: "S2 公开申请项目" })).toBeVisible();
+    await expect(enterprisePage.getByRole("navigation", { name: "需求方导航" })).toBeVisible();
+    await expect(enterprisePage.getByRole("link", { name: "返回项目列表" })).toHaveAttribute(
+      "href",
+      "/enterprise/projects",
+    );
     await enterprisePage.goto(`/enterprise/projects/${projectId}`);
     await expect(enterprisePage.getByText("项目已开工", { exact: false }).first()).toBeVisible();
     await expect(enterprisePage.getByRole("link", { name: "进入 Workspace" })).toBeVisible();

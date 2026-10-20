@@ -36,8 +36,9 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
   const workspace = await getWorkspace(userId, parsedProjectId.data);
   if (!workspace) notFound();
 
-  const role = actor.roles.includes("ENTERPRISE") ? "requester" : "builder";
-  const homeHref = role === "requester" ? "/enterprise/projects" : "/projects";
+  const role = workspace.viewerRole === "owner" ? "requester" : "builder";
+  const homeHref = workspace.viewerRole === "owner" ? "/enterprise/projects" : "/builder/applications";
+  const backLabel = workspace.viewerRole === "owner" ? "返回项目列表" : "返回我的申请";
 
   return (
     <div className="qz-paper min-h-[100svh]">
@@ -50,7 +51,7 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
       />
       <main className="qz-rise mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
         <Link href={homeHref} className="font-zh text-xs text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground">
-          ← 返回项目列表
+          ← {backLabel}
         </Link>
 
         <header className="mt-7 flex flex-col gap-5 border-b border-border pb-7 sm:flex-row sm:items-end sm:justify-between">

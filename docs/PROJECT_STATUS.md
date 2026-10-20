@@ -1,14 +1,22 @@
 # Qianzo 项目状态
 
-更新时间：2026-10-20（S2-02 实现、本地验收与主模型审核 PASS）
+更新时间：2026-10-20（PR #4 角色导航 P2 已本地修复并通过 targeted 验证；主模型复审 PASS）
 
-当前分支：`codex/s2-applications`，基于已同步的 `main` `185fd06d99a8de092963bd94b22dd38e5668a6bc`。PR #2/#3 已合并。S2-01 提交 `d1a3453` 与 S2-02 提交 `8e80bbf` 已发布为 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)，base 为 `main`，尚未合并；发布时尚无 GitHub 评审结论或远端 CI 结果。
+当前分支：`codex/s2-applications`，本地基线 HEAD `a8e960b6f80140472a4d99a424b447233f6397cd`，基于已同步的 `main` `185fd06d99a8de092963bd94b22dd38e5668a6bc`。PR #2/#3 已合并。S2-01 提交 `d1a3453` 与 S2-02 提交 `8e80bbf` 已发布为 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)，base 为 `main`，尚未合并。2026-10-20 15:24 UTC 自动评审只有一条 P2，已在本地修复。本次本地复审记录时尚未更新远端；自动评审结论仍对应修复前 `a8e960b`，不能据此声称修复后自动评审通过。
 
 远端基线：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) merge commit `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) merge commit `185fd06d99a8de092963bd94b22dd38e5668a6bc`。合并后的 main tree 为 `a62f4dd3907513faead7a42039ecbce4a96aac36`，与 PR #3 最终修复 head `126848a` 的 tree 相同；本次复核 `git diff --exit-code 126848a origin/main` 返回 0。
 
 当前 Slice：S2-01「Builder 申请与企业选择」与 S2-02「Builder Mock 押金、开工与 Workspace」均已实现、验收并通过主模型审核。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、Spec 可见性等 PPD 仍为 Pending。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
+
+## PR #4 Workspace 角色导航复审（2026-10-20）
+
+[PR #4 唯一 P2](https://github.com/xuyuufan/QianZo/pull/4#discussion_r4326774397)指出：Workspace 页面用账号全局 `ENTERPRISE` 角色决定 Header，导致同时持有 `ENTERPRISE` 与 `BUILDER` 的账号作为他人项目的已选 Builder 时仍看到企业导航与企业返回链接。Repository 已在同一请求中验证 owner 与当前 `ENGAGED` Builder 的项目关系；本地修复在其白名单 DTO 中增加不敏感的 `viewerRole: "owner" | "builder"`，由授权分支生成。页面据此显示对应导航，Builder 返回 `/builder/applications` 并标注“返回我的申请”，Owner 仍返回 `/enterprise/projects`。不向 DTO 加入 `ownerId`，外部参与者仍得到 404。
+
+复用检查先沿用现有 Workspace repository 授权判断、白名单 DTO、`ProjectHeader` 与产品导航。Next.js 16.3.5 本地指南 `node_modules/next/dist/docs/01-app/02-guides/data-security.md` 建议由服务端数据访问层检查授权并返回最小 DTO；[Vercel 官方指南源码](https://github.com/vercel/next.js/blob/canary/docs/01-app/02-guides/data-security.mdx)用于核对原则。[Supabase 官方 Next.js 用户管理示例](https://github.com/supabase/supabase/tree/master/examples/user-management/nextjs-user-management)聚焦个人资料与 RLS，没有本项目所需的 owner/engaged-Builder 关系逻辑；本地不采用其代码或引入依赖。
+
+修复前 synthetic 双角色 Builder 在 production E2E 中找不到 Workspace 的“开发者导航”，复现了该意见。修复后 `typecheck`、`lint`、Builder 开工 targeted PostgreSQL/Auth integration（3/3）和 `tests/e2e/applications.spec.ts` production E2E（1/1）通过；E2E 验证双角色 Builder 返回“我的申请”并重新进入 Workspace、双角色 Owner 显示需求方导航，以及其他企业和 Builder 仍为 404。未重跑完整 unit、integration 或 E2E 套件。验证日志及退出码在忽略目录 `artifacts/ui-parity/s2-02/pr4-role-review/`；首次在 Docker 未运行时的 Auth 连接失败单独保留，随后启动本地 Docker/Supabase 并完成产品红例与绿验证。`supabase migration list --local` 确认现有 11 条 migration 全部应用；本轮未运行 `db:prepare`、`db:reset`，未修改演示用户。代码与验证已通过主模型复审；本次本地复审记录时尚未更新远端，自动评审结论对应修复前 `a8e960b`，不代表修复后自动评审通过。
 
 ## S2-01 当前实施（2026-10-20）
 

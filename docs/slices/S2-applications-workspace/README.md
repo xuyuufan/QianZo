@@ -42,4 +42,14 @@ S2-01 的 E2E 命令输出、退出码与 Playwright 状态记录保存在本地
 
 本轮验证结果：`typecheck`、`lint` 均通过；unit 100/100 通过；串行 PostgreSQL/Auth integration 11 个文件、127/127 通过；Builder 开工 targeted integration 最终 3/3 通过。`db:prepare` exit 0，待应用列表为空，未执行 `db:reset`。fresh production build/start 上完整 E2E 为 17/17，exit 0（约 1.7 分钟）；manifest 共 15 项，其中 13 个产品路由、2 个内部错误路由。完整日志、退出码、Playwright 状态和路由清单在忽略目录 `artifacts/ui-parity/s2-02/verification-20261020/`。首次 targeted integration 中一条失败是 Drizzle 错误 `cause` 的断言层级，修正后 3/3 通过。两次早期完整 E2E 只因旧界面文案断言不匹配而失败，完整负结果保存在 `failed-first/` 与 `failed-second/`；修正断言后最终整套通过。pnpm 在切换 CI 环境时触发依赖目录重建，随后以 `corepack pnpm install --frozen-lockfile --force` 恢复成功，lockfile 未改；安装记录也在该忽略目录。
 
-实现、本地验收与主模型审核均已通过；S2-01/S2-02 提交已发布至 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)（base `main`），尚未合并；发布时尚无 GitHub 评审结论。S3 的成果提交、逐条验收与项目完成状态不属于本任务。
+S2-01/S2-02 原始范围的实现、本地验收与主模型审核均已通过；提交已发布至 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)（base `main`），尚未合并。其后收到的 Workspace 角色导航 P2 及本地修复记录见下文。S3 的成果提交、逐条验收与项目完成状态不属于本任务。
+
+## PR #4 Workspace 角色导航复审修复（2026-10-20）
+
+[唯一 P2 评审意见](https://github.com/xuyuufan/QianZo/pull/4#discussion_r4326774397)指出：双角色账号作为他人项目的已选 Builder 时，Workspace 页面按全局 `ENTERPRISE` 角色误显示企业导航和返回链接。保留 repository 已有的 owner/engaged-Builder 项目授权检查，在授权结果 DTO 增加 `viewerRole`，页面按本项目关系生成 `ProjectHeader` 与返回入口：Builder 到 `/builder/applications`（“返回我的申请”），Owner 到 `/enterprise/projects`。不返回 `ownerId`，非参与者仍为 404。
+
+复用检查沿用本仓库现有 Workspace repository 授权分支、白名单 DTO 和 `ProjectHeader`。Next.js 16.3.5 本地指南 `node_modules/next/dist/docs/01-app/02-guides/data-security.md` 及 [Vercel 官方指南源码](https://github.com/vercel/next.js/blob/canary/docs/01-app/02-guides/data-security.mdx)支持在服务端校验授权并返回最小 DTO。[Supabase 官方 Next.js 用户管理示例](https://github.com/supabase/supabase/tree/master/examples/user-management/nextjs-user-management)处理个人资料与 RLS，没有 owner/engaged-Builder 关系逻辑，因此未采用其代码或增加依赖。
+
+修复前 production E2E 由合成双角色 Builder 复现失败：Workspace 没有“开发者导航”。修复后 `typecheck`、`lint`、`tests/integration/builder-start.test.ts`（3/3）及 production `tests/e2e/applications.spec.ts`（1/1）通过。两侧 integration DTO 的公开 Workspace 内容相同，`viewerRole` 分别为 `builder` 和 `owner`；E2E 还验证 Builder 返回“我的申请”后可重进 Workspace、双角色 Owner 仍显示需求方导航、其他企业与 Builder 访问保持 404。
+
+日志、退出码和首次运行的环境失败记录在忽略目录 `artifacts/ui-parity/s2-02/pr4-role-review/`。第一轮因 Docker/Supabase 未启动，Auth synthetic user 创建连接失败；启动现有本地服务后，修复前 production 红例与修复后绿例均已完成。`supabase migration list --local` 显示已有 11 条迁移全部应用；本轮没有运行 `db:prepare`、`db:reset` 或修改演示用户。仅运行了 targeted 检查，未重跑全套 unit/integration/E2E。代码与验证已通过主模型复审。自动评审结论仍对应修复前 `a8e960b`；本次本地复审记录时尚未更新远端，不能据此声称修复后自动评审通过。

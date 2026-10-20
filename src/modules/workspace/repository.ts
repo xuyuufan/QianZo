@@ -82,7 +82,8 @@ export async function getWorkspaceWithDatabase(
 
   const canReadAsOwner = project.ownerId === actor.id && actor.roles.includes("ENTERPRISE");
   const canReadAsBuilder = selectedApplication.builderId === actor.id && actor.roles.includes("BUILDER");
-  if (!canReadAsOwner && !canReadAsBuilder) return null;
+  const viewerRole = canReadAsOwner ? "owner" : canReadAsBuilder ? "builder" : null;
+  if (!viewerRole) return null;
 
   const rows = await database
     .select({
@@ -120,6 +121,7 @@ export async function getWorkspaceWithDatabase(
   if (safeMilestones.length !== snapshot.document.milestones.length) return null;
   return {
     projectId: project.id,
+    viewerRole,
     title: snapshot.title,
     startedAt: project.startedAt.toISOString(),
     milestones: safeMilestones,
