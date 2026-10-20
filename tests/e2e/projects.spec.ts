@@ -120,7 +120,7 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   await expect(page.locator("main ul a")).toHaveCount(7);
   await expect(page.getByRole("navigation", { name: "项目状态筛选" })).toContainText(/全部\s*7/);
   await expect(page.getByRole("navigation", { name: "项目状态筛选" })).toContainText(/草稿\s*7/);
-  await expect(page.getByRole("navigation", { name: "项目状态筛选" })).toContainText(/等待开发者\s*0/);
+  await expect(page.getByRole("navigation", { name: "项目状态筛选" })).toContainText(/招募与进行中\s*0/);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.evaluate(() => document.fonts.ready);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -132,7 +132,7 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   await expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(await page.evaluate(() => document.documentElement.clientWidth));
   await page.screenshot({ path: test.info().outputPath("my-projects-mobile.png"), fullPage: true, animations: "disabled" });
   await page.goto("/enterprise/projects?status=open");
-  await expect(page.getByText("暂无等待开发者项目。" )).toBeVisible();
+  await expect(page.getByText("暂无招募与进行中项目。" )).toBeVisible();
   await expect(page.getByRole("link", { name: /E2E 原始项目/ })).toHaveCount(0);
   await page.goto("/enterprise/projects?status=draft");
   await expect(page.getByRole("link", { name: /E2E 原始项目/ })).toBeVisible();
@@ -140,7 +140,7 @@ test("a draft persists while other enterprises and Builders remain isolated", as
   await page.goto(projectPath);
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(page.getByText("验收将在项目开工和交付后开放。" )).toBeVisible();
+  await expect(page.getByText("成果提交与验收暂未开放。" )).toBeVisible();
   await expect(page.getByRole("button", { name: "验收" })).toBeDisabled();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.evaluate(() => document.fonts.ready);

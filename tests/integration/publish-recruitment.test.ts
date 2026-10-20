@@ -7,6 +7,7 @@ import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { completeOnboardingWithDatabase, type Actor } from "@/modules/identity/onboarding";
+import { applyToProjectWithDatabase, selectApplicationWithDatabase } from "@/modules/applications/repository";
 import { simulatePaymentSuccessWithDatabase } from "@/modules/payments/repository";
 import { publishProjectWithDatabase } from "@/modules/projects/publish";
 import { saveReferenceBudgetWithDatabase } from "@/modules/projects/repository";
@@ -94,10 +95,14 @@ async function rawProject(projectId: string) {
       status: string;
       version: number;
       published_at: Date | null;
+      updated_at: Date;
       published_spec_snapshot: unknown;
+      selected_application_id: string | null;
+      started_at: Date | null;
     }[]
   >`
-    select status, version, published_at, published_spec_snapshot
+    select status, version, published_at, updated_at, published_spec_snapshot,
+      selected_application_id, started_at
     from app.projects where id = ${projectId}
   `;
   return row;
@@ -143,7 +148,7 @@ beforeAll(async () => {
 
   enterpriseA = await completeOnboardingWithDatabase(database, userIds[0], {
     displayName: "发布测试企业 A",
-    roles: ["ENTERPRISE"],
+    roles: ["ENTERPRISE", "BUILDER"],
   });
   enterpriseB = await completeOnboardingWithDatabase(database, userIds[1], {
     displayName: "发布测试企业 B",
@@ -339,6 +344,37 @@ describe("publish transaction", () => {
 
     const afterConflict = await rawProject(fixture.project.id);
     expect(afterConflict.published_spec_snapshot).toEqual(afterReplay.published_spec_snapshot);
+  });
+
+  it("replays the original publish intent after a Builder has been selected", async () => {
+    const { fixture, projectVersion } = await createDepositPaidProject(database, enterpriseA);
+    const masked = validSpecDocument();
+    const originalInput = publishInput(fixture, projectVersion, masked);
+    const published = await publishProjectWithDatabase(database, enterpriseA, originalInput);
+    const application = await applyToProjectWithDatabase(database, builder, {
+      projectId: fixture.project.id,
+      statement: "Still interested after reviewing the scope.",
+    });
+    await selectApplicationWithDatabase(database, enterpriseA, {
+      projectId: fixture.project.id,
+      applicationId: application.applicationId,
+      expectedVersion: published.version,
+    });
+
+    const beforeReplay = await rawProject(fixture.project.id);
+    expect(beforeReplay.status).toBe("AWAITING_BUILDER");
+    const replay = await publishProjectWithDatabase(database, enterpriseA, originalInput);
+    expect(replay.status).toBe("AWAITING_BUILDER");
+    expect(await rawProject(fixture.project.id)).toEqual(beforeReplay);
+
+    const changedTitle = publishInput(fixture, projectVersion, masked, {
+      maskedTitle: "不同的招募标题",
+    });
+    await expect(publishProjectWithDatabase(database, enterpriseA, changedTitle)).rejects.toMatchObject({
+      name: "ProjectError",
+      code: "PUBLISH_CONFLICT",
+    });
+    expect(await rawProject(fixture.project.id)).toEqual(beforeReplay);
   });
 
   it("keeps the published-state rules in the database", async () => {
@@ -552,6 +588,7 @@ describe("recruitment view", () => {
     const detail = await getOpenRecruitmentWithDatabase(database, builder, fixture.project.id);
     expect(Object.keys(detail ?? {}).sort()).toEqual([
       "budgetLabel",
+      "canApply",
       "deliveryDays",
       "document",
       "projectId",
@@ -561,6 +598,21 @@ describe("recruitment view", () => {
     expect(detail?.document.milestones).toHaveLength(2);
     expect(detail?.budgetLabel).toBe("¥1000.00 – ¥2500.50");
     expect(detail?.deliveryDays).toBe(24);
+    expect(detail?.canApply).toBe(true);
+
+    const ownerDualRoleDetail = await getOpenRecruitmentWithDatabase(
+      database,
+      enterpriseA,
+      fixture.project.id,
+    );
+    expect(ownerDualRoleDetail?.canApply).toBe(false);
+
+    const enterpriseOnlyDetail = await getOpenRecruitmentWithDatabase(
+      database,
+      enterpriseB,
+      fixture.project.id,
+    );
+    expect(enterpriseOnlyDetail?.canApply).toBe(false);
 
     // Private projects and drafts read as absent for everyone.
     expect(await getOpenRecruitmentWithDatabase(database, builder, draft.project.id)).toBeNull();
@@ -577,12 +629,14 @@ describe("recruitment view", () => {
     expect(readByOtherEnterprise?.title).toBe("已脱敏的招募标题");
 
     // Nothing private leaks through the DTOs.
-    const serialized = JSON.stringify({ listed, detail });
+    const serialized = JSON.stringify({ listed, detail, ownerDualRoleDetail, enterpriseOnlyDetail });
     expect(serialized).not.toContain("ZZSECRET");
     expect(serialized).not.toContain(secretRequirement);
     expect(serialized).not.toContain("qianzo.test");
     expect(serialized).not.toContain("originalRequirement");
     expect(serialized).not.toContain("lockedSpecVersionId");
+    expect(serialized).not.toContain("ownerId");
+    expect(serialized).not.toContain("rawSpec");
   });
 
   it("refuses a disabled account", async () => {

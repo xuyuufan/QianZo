@@ -1,7 +1,7 @@
 import type { PaymentProvider } from "./provider";
 
 /**
- * S1 runs the in-process mock: creating a payment has no side effect outside the
+ * The local slices run the in-process mock: creating a payment has no side effect outside the
  * platform database, and no provider reference is stored (a provider payment id
  * belongs to the real-payment contract, which this slice does not build).
  */
@@ -18,6 +18,13 @@ export const mockPaymentProvider: PaymentProvider = {
  */
 export const enterpriseDeposit = {
   purpose: "ENTERPRISE_DEPOSIT",
+  amountMinor: 100,
+  currency: "CNY",
+} as const;
+
+/** Fixed local demonstration amount for the selected Builder; not a product price. */
+export const builderDeposit = {
+  purpose: "BUILDER_DEPOSIT",
   amountMinor: 100,
   currency: "CNY",
 } as const;

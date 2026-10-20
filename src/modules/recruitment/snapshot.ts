@@ -46,6 +46,8 @@ export type RecruitmentDetail = {
   budgetLabel: string;
   deliveryDays: number;
   publishedAt: Date;
+  /** Safe viewer capability; does not expose project ownership. */
+  canApply: boolean;
 };
 
 export function buildRecruitmentSnapshot(params: {
@@ -94,6 +96,7 @@ export function toRecruitmentDetail(
   projectId: string,
   publishedAt: Date,
   snapshot: RecruitmentSnapshot,
+  canApply: boolean,
 ): RecruitmentDetail {
   return {
     projectId,
@@ -102,6 +105,7 @@ export function toRecruitmentDetail(
     budgetLabel: describeRecruitmentBudget(snapshot),
     deliveryDays: specDeliveryDays(snapshot.document),
     publishedAt,
+    canApply,
   };
 }
 

@@ -16,9 +16,9 @@ import {
 } from "./snapshot";
 
 /**
- * Recruitment reads only ever select the published snapshot and the timestamp
- * that carries it. The private columns (original requirement, owner, budget
- * pointer, payment) are never fetched, so they cannot leak through a DTO.
+ * Recruitment DTOs are built from the published snapshot and timestamp. The
+ * public detail path also reads ownerId internally to hide the self-apply form;
+ * it is reduced to a boolean and never crosses the DTO boundary.
  */
 const recruitmentColumns = {
   id: projects.id,
@@ -57,7 +57,7 @@ export async function getOpenRecruitmentWithDatabase(
   const parsedProjectId = projectIdSchema.parse(projectId);
 
   const [row] = await database
-    .select(recruitmentColumns)
+    .select({ ...recruitmentColumns, ownerId: projects.ownerId })
     .from(projects)
     .where(and(eq(projects.id, parsedProjectId), eq(projects.status, "OPEN")))
     .limit(1);
@@ -69,5 +69,10 @@ export async function getOpenRecruitmentWithDatabase(
   if (!snapshot) {
     return null;
   }
-  return toRecruitmentDetail(row.id, row.publishedAt, snapshot);
+  return toRecruitmentDetail(
+    row.id,
+    row.publishedAt,
+    snapshot,
+    actor.roles.includes("BUILDER") && row.ownerId !== actor.id,
+  );
 }

@@ -71,9 +71,21 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const depositSucceeded = paymentState?.payment?.status === "SUCCEEDED";
   const budget = describeBudget(project.budgetMinMinor, project.budgetMaxMinor, project.currency);
   const currency = project.currency ?? DEMO_CURRENCY;
-  const statusLabel = project.status === "OPEN" ? "招募中" : locked ? "范围已锁定" : "草稿";
-  const stageLabel = project.status === "OPEN"
-    ? "招募已开放"
+  const statusLabel = project.status === "AWAITING_BUILDER"
+    ? "等待 Builder Mock 押金"
+    : project.status === "IN_PROGRESS"
+      ? "进行中"
+    : project.status === "OPEN"
+      ? "招募中"
+      : locked
+        ? "范围已锁定"
+        : "草稿";
+  const stageLabel = project.status === "AWAITING_BUILDER"
+    ? "已选择 Builder，等待 Mock 押金；尚未开工"
+    : project.status === "IN_PROGRESS"
+      ? "Builder 模拟押金已完成，项目已开工"
+    : project.status === "OPEN"
+      ? "招募已开放"
     : locked
       ? depositSucceeded
         ? "范围已确认，模拟定金已完成，等待发布"
@@ -81,13 +93,21 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       : history.current
         ? "Spec 已保存，待确认范围"
         : "需求待整理";
-  const primaryHref = project.status === "OPEN"
-    ? `/projects/${project.id}`
+  const primaryHref = project.status === "AWAITING_BUILDER"
+    ? `/enterprise/projects/${project.id}/applications`
+    : project.status === "IN_PROGRESS"
+      ? `/projects/${project.id}/workspace`
+    : project.status === "OPEN"
+      ? `/projects/${project.id}`
     : locked
       ? `/enterprise/projects/${project.id}/publish`
       : `/enterprise/projects/${project.id}/spec`;
-  const primaryLabel = project.status === "OPEN"
-    ? "查看招募页"
+  const primaryLabel = project.status === "AWAITING_BUILDER"
+    ? "查看申请与已选 Builder"
+    : project.status === "IN_PROGRESS"
+      ? "进入 Workspace"
+    : project.status === "OPEN"
+      ? "查看招募页"
     : locked
       ? "Mock 定金与发布"
       : "需求访谈与 Spec";
@@ -123,10 +143,15 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             <Button asChild size="sm" className="bg-foreground text-background hover:bg-foreground/90">
               <Link href={primaryHref}>{primaryLabel}<ArrowRight className="ml-1 size-3.5" strokeWidth={1.5} /></Link>
             </Button>
+            {project.status === "OPEN" ? (
+              <Button asChild variant="outline" size="sm" className="font-zh text-xs">
+                <Link href={`/enterprise/projects/${project.id}/applications`}>查看申请</Link>
+              </Button>
+            ) : null}
           </div>
         </div>
 
-        <MilestoneAxis document={history.current?.document ?? null} />
+        <MilestoneAxis document={history.current?.document ?? null} inProgress={project.status === "IN_PROGRESS"} />
 
         <nav className="mt-10 flex items-center gap-6 overflow-x-auto border-b border-border" aria-label="项目详情标签">
           {tabItems.map((item) => {
@@ -134,15 +159,16 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             const href = item.id === "overview" ? `/enterprise/projects/${project.id}` : `/enterprise/projects/${project.id}?tab=${item.id}`;
             return <Link key={item.id} href={href} aria-current={current ? "page" : undefined} className={`relative flex h-11 shrink-0 items-center font-brand text-xs transition-colors ${current ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-foreground" : "text-muted-foreground hover:text-foreground"}`}>{item.label}</Link>;
           })}
-          <button type="button" disabled aria-disabled="true" aria-describedby="acceptance-disabled-reason" title="项目开工和交付后开放" className="relative flex h-11 shrink-0 cursor-not-allowed items-center font-zh text-xs text-muted-foreground/60">验收</button>
+          <button type="button" disabled aria-disabled="true" aria-describedby="acceptance-disabled-reason" title="当前尚未开放交付验收" className="relative flex h-11 shrink-0 cursor-not-allowed items-center font-zh text-xs text-muted-foreground/60">验收</button>
         </nav>
-        <p id="acceptance-disabled-reason" className="pt-3 font-zh text-[11px] text-muted-foreground">验收将在项目开工和交付后开放。</p>
+        <p id="acceptance-disabled-reason" className="pt-3 font-zh text-[11px] text-muted-foreground">成果提交与验收暂未开放。</p>
 
         <div className="pt-8">
           {selectedTab === "overview" ? (
             <OverviewPanel
               project={{ id: project.id, title: project.title, originalRequirement: project.originalRequirement, version: project.version }}
               requesterName={actor.displayName}
+              builderLabel={project.status === "IN_PROGRESS" ? "已开工" : project.status === "AWAITING_BUILDER" ? "已选定，等待 Mock 押金" : "尚未承接"}
               stageLabel={stageLabel}
               locked={locked}
               budget={budget}
@@ -159,7 +185,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
               currentVersionId={history.current?.id ?? null}
             />
           ) : (
-            <MilestonesTab document={history.current?.document ?? null} />
+            <MilestonesTab document={history.current?.document ?? null} inProgress={project.status === "IN_PROGRESS"} />
           )}
         </div>
       </main>
@@ -167,7 +193,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   );
 }
 
-function MilestoneAxis({ document }: { document: SpecDocumentV1 | null }) {
+function MilestoneAxis({ document, inProgress }: { document: SpecDocumentV1 | null; inProgress: boolean }) {
   const milestones = document?.milestones ?? [];
   return (
     <section className="mt-6 overflow-hidden rounded-md border border-border bg-card p-5 sm:p-6" aria-label="计划里程碑">
@@ -182,7 +208,7 @@ function MilestoneAxis({ document }: { document: SpecDocumentV1 | null }) {
                 <span className="relative z-10 grid size-6 place-items-center rounded-full border border-border bg-card font-brand text-[9px] text-muted-foreground">{index + 1}</span>
                 <p className="mt-3 font-brand text-[10px] uppercase text-muted-foreground">M{String(index + 1).padStart(2, "0")} · 第 {milestone.dueAfterDays} 天</p>
                 <p className="mt-1 max-w-48 font-zh text-sm">{milestone.title}</p>
-                <p className="mt-1 font-zh text-xs text-muted-foreground">计划 · 未开工</p>
+                <p className="mt-1 font-zh text-xs text-muted-foreground">{inProgress ? "项目已开工" : "计划 · 未开工"}</p>
               </li>
             ))}
           </ol>
@@ -195,6 +221,7 @@ function MilestoneAxis({ document }: { document: SpecDocumentV1 | null }) {
 function OverviewPanel({
   project,
   requesterName,
+  builderLabel,
   stageLabel,
   locked,
   budget,
@@ -204,6 +231,7 @@ function OverviewPanel({
 }: {
   project: { id: string; title: string; originalRequirement: string; version: number };
   requesterName: string;
+  builderLabel: string;
   stageLabel: string;
   locked: boolean;
   budget: string | null;
@@ -215,13 +243,13 @@ function OverviewPanel({
     <div className="space-y-8">
       <div className="grid gap-px border border-border bg-border md:grid-cols-3">
         <SummaryCell label="需求方" value={requesterName} />
-        <SummaryCell label="开发者" value="尚未承接" />
+        <SummaryCell label="开发者" value={builderLabel} />
         <SummaryCell label="当前阶段" value={stageLabel} />
       </div>
 
       <section aria-labelledby="activity-title">
         <p id="activity-title" className="font-brand text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Activity</p>
-        <p className="mt-3 font-zh text-sm text-muted-foreground">S0/S1 暂不记录活动动态；项目状态和 Spec 历史可在对应页面查看。</p>
+        <p className="mt-3 font-zh text-sm text-muted-foreground">当前不记录项目动态；状态、里程碑和 Spec 历史可在对应页面查看。</p>
       </section>
 
       <div className="grid gap-8 border-y border-border py-6 lg:grid-cols-2 lg:gap-10">
@@ -303,7 +331,7 @@ function SpecTab({
   );
 }
 
-function MilestonesTab({ document }: { document: SpecDocumentV1 | null }) {
+function MilestonesTab({ document, inProgress }: { document: SpecDocumentV1 | null; inProgress: boolean }) {
   if (!document) return <p className="py-12 text-center font-zh text-sm text-muted-foreground">还没有保存过 Spec，因此没有里程碑计划。</p>;
   const deliverables = new Map(document.deliverables.map((item) => [item.id, item.title]));
   return (
@@ -317,7 +345,7 @@ function MilestonesTab({ document }: { document: SpecDocumentV1 | null }) {
         <article key={milestone.id} className="grid gap-4 py-6 sm:grid-cols-[72px_minmax(0,1fr)_auto]">
           <span className="font-brand text-xs text-muted-foreground">M{String(index + 1).padStart(2, "0")}</span>
           <div className="min-w-0">
-            <h2 className="font-zh text-sm">{milestone.title}<span className="ml-2 font-zh text-xs text-muted-foreground">计划 · 未开工</span></h2>
+            <h2 className="font-zh text-sm">{milestone.title}<span className="ml-2 font-zh text-xs text-muted-foreground">{inProgress ? "项目已开工 · 状态详情见 Workspace" : "计划 · 未开工"}</span></h2>
             <p className="mt-2 font-zh text-sm leading-6 text-muted-foreground">{milestone.description}</p>
             <p className="mt-3 font-zh text-xs text-muted-foreground">交付物：{milestone.deliverableIds.map((id) => deliverables.get(id) ?? id).join("、") || "未指定"}</p>
             <ul className="mt-5 space-y-4 border-t border-border pt-4">

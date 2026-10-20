@@ -1,6 +1,6 @@
 # Qianzo
 
-Qianzo 当前完成了 S0 与 S1：企业通过真实 Supabase Auth 登录后可以创建项目草稿，用 Mock AIPM 访谈生成候选 Spec，审核保存并锁定范围，填写参考预算、完成模拟企业定金，确认脱敏预览后发布。已发布项目对任何登录用户可见可评估。企业间资源隔离、Builder 角色拒绝、并发冲突、锁定不可改写、定金只生效一次、发布原子性与脱敏边界都在服务端和真实 PostgreSQL 上验证。[S1 施工规格](docs/slices/S1-spec-publish/README.md) 已实施，状态与验证证据见 [PROJECT_STATUS](docs/PROJECT_STATUS.md)。
+Qianzo 已完成 S0、S1 与 S2-01 的实现、本地验收和主模型审核；S2-02 Builder Mock 押金、项目开工与 Workspace 已实现、本地验收并通过主模型审核。已发布招募快照只对公开项目提供，申请和开工操作经真实 Supabase Auth、服务端业务规则和 PostgreSQL 约束处理。切片范围见 [S1 施工规格](docs/slices/S1-spec-publish/README.md) 与 [S2 当前施工计划](docs/slices/S2-applications-workspace/README.md)，状态和验证证据见 [PROJECT_STATUS](docs/PROJECT_STATUS.md)。
 
 ## 本机要求
 
@@ -28,6 +28,8 @@ corepack pnpm -v # 显示 11.19.0
 `corepack enable pnpm`（会在 Node 24 目录生成 shim）；也可把 `D:\` 固定加到用户 PATH 最前面。
 
 `SUPABASE_PROJECT_ID` 对应本仓库 `supabase/config.toml` 的本地项目名。显式设置可避免被忽略的旧 `.env` 中其他项目编号覆盖 CLI 的目标，导致 `db:start` / `db:prepare` 查找错误的本地容器；这项设置只作用于当前终端。
+
+仓库固定 `enableGlobalVirtualStore: false`，以避免 pnpm 11.19.0 在 `CI` 环境变量切换时误判虚拟 store 状态并重建 `node_modules`；背景与 workaround 见 [pnpm issue #12337](https://github.com/pnpm/pnpm/issues/12337)。
 
 ## 从 checkout 启动
 
@@ -83,7 +85,11 @@ Select-String DEMO_USER_PASSWORD D:\Qianzo\.env.tools.local
 10. 在结构化脱敏编辑器里替换需要保密的文字，检查预览和全部验收标准及验证方法，勾选「我已确认这是最终预览」后发布。（ID、条目数量与顺序、引用和工期不可编辑；文字变化后须重新确认）
 11. 用 Builder 登录并打开「招募浏览」。（能看到已发布项目、脱敏后的完整 Spec、参考预算与周期；看不到企业的原始需求、访谈对话、账号或付款明细）
 
-第 3、4、5 步验证隔离与并发，第 6～11 步验证 S1 链路：锁定不可改写、定金只生效一次、发布原子且不可回滚、招募视图只暴露脱敏快照。这些点都在服务端和数据库上验证，不是前端隐藏按钮。
+第 3、4、5 步验证隔离与并发，第 6～11 步验证 S1 链路：锁定不可改写、定金只生效一次、发布原子且不可回滚、招募视图只暴露脱敏快照。第 12～14 步验证 S2 申请、选择、Builder Mock 押金与 Workspace；服务端和数据库共同执行授权与状态转换，不依赖前端隐藏按钮。
+
+12. Builder 在公开项目详情提交申请；企业从项目的「查看申请」入口选择该 Builder。（项目变为等待 Builder 模拟押金，企业不能代替 Builder 操作押金。）
+13. Builder 打开 `/builder/applications`，创建并模拟固定本地 ¥1.00 押金成功。（不发生真实收付，也不代表合同接受；成功后项目进入进行中。）
+14. 企业与已选 Builder 从项目入口进入 `/projects/<projectId>/workspace`，检查公开标题、计划截止日、交付物、验收标准和验证方法；其他企业和 Builder 访问同一地址应看到 404。（当前没有成果提交、审核或验收按钮。）
 
 ## 验证
 
@@ -128,13 +134,13 @@ corepack pnpm demo:seed
 
 ## 当前边界
 
-- S1 累计 7 张业务表：`app.users`、`app.user_roles`、`app.projects`、`app.aipm_sessions`、`app.aipm_messages`、`app.spec_versions`、`app.payments`。
+- S2-01 增加 `app.applications` 与项目选中申请指针；S2-02 已实现 Builder 模拟押金、开工事务、里程碑初始化与 Workspace，字段、约束和权限见 [S2 README](docs/slices/S2-applications-workspace/README.md)。
 - 资源隔离由每个服务端入口执行；当前没有用户级 RLS，且不会宣称已有该隔离层。
-- 链路到「项目 OPEN、其他登录用户可评估」为止，不是完整交易闭环：申请、选择、Builder Mock 押金与开工尚未开始。
+- S2-01 将项目推进到 `AWAITING_BUILDER`；S2-02 已贯通 Builder Mock 押金、开工、Milestone 初始化与共享 Workspace。本地完整 E2E 已通过；Mock 不代表真实资金结算或合同接受。
 - S1 不提供解锁、下架、重新发布或修改已公开内容；已发布快照、锁定范围与 Spec 历史均不可改写。
-- 尚未实现真实 AIPM、真实支付、Workspace、文件上传、通知、管理员界面或生产部署。
+- 尚未实现真实 AIPM、真实支付、文件上传、通知、管理员界面或生产部署；本地 Workspace 仅显示锁定公开范围派生的计划信息。
 - 演示账号与本地数据库只用于合成开发数据，不代表企业认证、合同接受或真实交易；模拟定金不代表真实收付。
-- 下一施工项是 S2，开工需要新的明确授权。
+- S2-02 已通过主模型审核；S3 成果提交与验收不属于本 Slice。
 
 ## 权威文档
 
@@ -143,4 +149,5 @@ corepack pnpm demo:seed
 - [施工切片](docs/BUILD_SLICES.md)
 - [S0 施工规格](docs/slices/S0-project-draft/README.md)
 - [S1 施工规划：需求变成可招募项目](docs/slices/S1-spec-publish/README.md)
+- [S2 当前施工计划：申请与 Workspace](docs/slices/S2-applications-workspace/README.md)
 - [当前项目状态](docs/PROJECT_STATUS.md)

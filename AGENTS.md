@@ -5,7 +5,7 @@
 1. [工程总纲 V0.2](docs/QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md)
 2. [开发与 Git 工作流程](docs/DEVELOPMENT_WORKFLOW.md)
 3. [S0～S3 施工切片](docs/BUILD_SLICES.md)
-4. 当前 Slice README；[S1：需求变成可招募项目](docs/slices/S1-spec-publish/README.md)（2026-09-24 完成本地实现与验收）；上一阶段基线见 [S0](docs/slices/S0-project-draft/README.md)
+4. 当前 Slice README；[S2：申请与企业选择](docs/slices/S2-applications-workspace/README.md)（S2-01/S2-02 已完成本地验收）；已完成基线见 [S1：需求变成可招募项目](docs/slices/S1-spec-publish/README.md) 与 [S0](docs/slices/S0-project-draft/README.md)
 5. 当前任务及已存在的项目状态、相关代码和测试；当前状态见 [PROJECT_STATUS](docs/PROJECT_STATUS.md)
 
 远端仓库：`https://github.com/xuyuufan/QianZo.git`。
@@ -34,6 +34,7 @@
 
 - 修改前检查已有文件、分支和工作区状态；保留他人工作。
 - 每项任务按 PLAN → EXECUTE → REVIEW 执行：主模型先指定范围和验收，GPT-6 Luna Max 负责实现、测试与文档，主模型审核并给出 PASS / REVISE / STOP；执行者提交验证证据，不以自审替代主审。指定模型不可用时如实报告，由主模型决定后续，不静默换模。
+- 主模型可将相互独立的任务并行分配给多个 GPT-6 Luna Max 子 agent，并统一规划与审核；避免多人同时修改同一文件，共用数据库的验证串行执行。
 - 先检查本地已有实现，再定向搜索 GitHub 上官方或维护良好的可复用代码，并记录链接及采用或不采用的原因。采用前核实许可证、版本兼容性、安全性和授权规则；不整仓照搬或引入无关依赖。没有合适候选时，做最小增量实现，不强行复用。
 - 不预建当前需求以外的架构或通用框架；按本文件的不变量和开发流程完成授权、关键事务与唯一约束、相关验证、必要文档及本地提交。
 - 涉及功能的授权、验证和测试与实现一起完成。

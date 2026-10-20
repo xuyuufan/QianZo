@@ -1,14 +1,52 @@
 # Qianzo 项目状态
 
-更新时间：2026-10-20（PR #2 已合并；PR #3 新复审修复与最终验证通过，主模型审查 PASS）
+更新时间：2026-10-20（PR #4 角色导航及后续动作重放意见均已本地修复、定向验证并通过主模型复审）
 
-当前分支：`codex/s1-review-closeout`，PR #3 已审核衔接基线 `42e692a84d5e517d2e500c823ac0d4a713ed2005` 的 tree 与 UI HEAD `8989517` 相同，并已同步到 `feat/lovable-ui-parity`。本次延迟角色导航修复、E2E 回归与文档更新已通过主审和最终验证；接下来按已授权流程更新现有 PR #3 并合并。
+当前分支：`codex/s2-applications`，本轮复审基线 HEAD `3751841f4b7c7b1a582916826e727df67f6ac3af`，基于已同步的 `main` `185fd06d99a8de092963bd94b22dd38e5668a6bc`。PR #2/#3 已合并。S2-01 提交 `d1a3453` 与 S2-02 提交 `8e80bbf` 已发布为 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)，base 为 `main`，尚未合并。首轮自动评审在 `a8e960b` 上报告一条角色导航 P2，已本地修复；后续自动评审在 `3751841` 上报告发布重放 P2。主模型检查同类动作时另发现选人重放问题；两项本地修复均经定向验证及主模型复审 PASS。本次本地复审记录时修复尚未更新远端；自动评审结论仍对应修复前 `3751841`，不能据此声称修复后自动评审通过。
 
-远端状态（本次本地提交前）：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) 已于 2026-10-15 squash 合并，merge commit 为 `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) 为 OPEN，base=`main`，远端 head=`42e692a84d5e517d2e500c823ac0d4a713ed2005`。主模型于 2026-10-20 发现第 4 条未解决 UI 评审意见；本地修复、最终验证和主审均已通过，接下来按已授权流程更新现有 PR 并合并。
+远端基线：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) merge commit `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) merge commit `185fd06d99a8de092963bd94b22dd38e5668a6bc`。合并后的 main tree 为 `a62f4dd3907513faead7a42039ecbce4a96aac36`，与 PR #3 最终修复 head `126848a` 的 tree 相同；本次复核 `git diff --exit-code 126848a origin/main` 返回 0。
 
-当前 Slice：S1「需求变成可招募项目」已完成并合入 `main`；PR #3 的 UI 基线修复已通过本地主审与验证，等待按授权流程合并。S2 尚未开始；待 PR #3 合并、在最新 `main` 复验后再开始 S2。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、可见性等 PPD 仍为 Pending。
+当前 Slice：S2-01「Builder 申请与企业选择」与 S2-02「Builder Mock 押金、开工与 Workspace」均已实现、验收并通过主模型审核。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、Spec 可见性等 PPD 仍为 Pending。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
+
+## PR #4 Workspace 角色导航复审（2026-10-20）
+
+[首轮自动评审中的唯一 P2](https://github.com/xuyuufan/QianZo/pull/4#discussion_r4326774397)指出：Workspace 页面用账号全局 `ENTERPRISE` 角色决定 Header，导致同时持有 `ENTERPRISE` 与 `BUILDER` 的账号作为他人项目的已选 Builder 时仍看到企业导航与企业返回链接。Repository 已在同一请求中验证 owner 与当前 `ENGAGED` Builder 的项目关系；本地修复在其白名单 DTO 中增加不敏感的 `viewerRole: "owner" | "builder"`，由授权分支生成。页面据此显示对应导航，Builder 返回 `/builder/applications` 并标注“返回我的申请”，Owner 仍返回 `/enterprise/projects`。不向 DTO 加入 `ownerId`，外部参与者仍得到 404。
+
+复用检查先沿用现有 Workspace repository 授权判断、白名单 DTO、`ProjectHeader` 与产品导航。Next.js 16.3.5 本地指南 `node_modules/next/dist/docs/01-app/02-guides/data-security.md` 建议由服务端数据访问层检查授权并返回最小 DTO；[Vercel 官方指南源码](https://github.com/vercel/next.js/blob/canary/docs/01-app/02-guides/data-security.mdx)用于核对原则。[Supabase 官方 Next.js 用户管理示例](https://github.com/supabase/supabase/tree/master/examples/user-management/nextjs-user-management)聚焦个人资料与 RLS，没有本项目所需的 owner/engaged-Builder 关系逻辑；本地不采用其代码或引入依赖。
+
+修复前 synthetic 双角色 Builder 在 production E2E 中找不到 Workspace 的“开发者导航”，复现了该意见。修复后 `typecheck`、`lint`、Builder 开工 targeted PostgreSQL/Auth integration（3/3）和 `tests/e2e/applications.spec.ts` production E2E（1/1）通过；E2E 验证双角色 Builder 返回“我的申请”并重新进入 Workspace、双角色 Owner 显示需求方导航，以及其他企业和 Builder 仍为 404。未重跑完整 unit、integration 或 E2E 套件。验证日志及退出码在忽略目录 `artifacts/ui-parity/s2-02/pr4-role-review/`；首次在 Docker 未运行时的 Auth 连接失败单独保留，随后启动本地 Docker/Supabase 并完成产品红例与绿验证。`supabase migration list --local` 确认现有 11 条 migration 全部应用；本轮未运行 `db:prepare`、`db:reset`，未修改演示用户。代码与验证已通过主模型复审；本次本地复审记录时尚未更新远端，自动评审结论对应修复前 `a8e960b`，不代表修复后自动评审通过。
+
+## PR #4 后续动作重放复审（2026-10-20；主模型复审 PASS）
+
+[后续自动评审意见](https://github.com/xuyuufan/QianZo/pull/4#discussion_r4327003815)报告发布重放缺陷：项目从 `OPEN` 进入 `AWAITING_BUILDER` 或 `IN_PROGRESS` 后，原始发布请求用初始 `expectedVersion` 重放会误报版本冲突。主模型检查同类后续动作时另外发现，已选申请进入 `IN_PROGRESS` 后重放相同选人请求也会误报冲突。发布重放现依据不可变 `publishedAt` 识别已发布项目，仍比较锁定 Spec、标题和规范化文档；相同预览返回当前项目，不同预览仍报 `PUBLISH_CONFLICT`。选人重放仅在 `AWAITING_BUILDER` 或 `IN_PROGRESS` 且选中申请 ID 相同时成功。原有项目行锁、owner/ACTIVE `ENTERPRISE` 授权及不同申请冲突保持不变，无 migration。
+
+复用检查沿用现有 `withProjectLock` 和领域重放分支。[PostgreSQL 官方锁管理源码](https://github.com/postgres/postgres/blob/master/src/backend/storage/lmgr/README)与 [Drizzle PostgreSQL `transaction` 实现](https://github.com/drizzle-team/drizzle-orm/blob/main/drizzle-orm/src/pg-core/db.ts)只用于核对锁/事务语义；没有可直接采用的项目级重放实现，因此不复制外部代码或引入依赖。
+
+修复前真实 PostgreSQL/Auth 回归复现选定 Builder 后的发布冲突，以及开工后原发布和原选人请求均失败。修复后串行 targeted integration 通过：`publish-recruitment` 16/16、`builder-start` 4/4、`applications` 5/5；typecheck 与 lint 通过。测试核验项目状态、版本、发布时间与更新时间、快照、已选申请、开工时间以及相关申请、押金和 Milestone 均未因重放或冲突请求改变。红绿日志与退出码保存在忽略目录 `artifacts/ui-parity/s2-02/pr4-publish-replay/`。使用本地 `D:\node.exe` 和已安装 Vitest 5.0.1；`pnpm exec` 的 Windows 锁文件移动错误单独记录为环境失败，未改 lockfile。未重跑全套 unit/integration/E2E，未运行 `db:prepare`、`db:reset` 或修改演示用户。本地修复已通过主模型复审；本次复审记录时远端仍对应 `3751841`，自动评审不代表修复后通过。
+
+## S2-01 当前实施（2026-10-20）
+
+已新增 S2 README、`applications` migration、服务端申请/选择与白名单 DTO、Builder「我的申请」和企业申请列表入口，并将 `db:prepare` 应用于本地数据库（未执行 `db:reset`）。`typecheck`、`lint`、12 个文件的 100/100 unit、串行 10 个文件的 122/122 integration，以及生产构建上的 17/17 E2E 均通过。构建生成 12 个产品路由（Next app-paths manifest 共 14 项，另含 2 个内部错误路由）。完整 E2E 日志与退出码保存在忽略目录 `artifacts/ui-parity/s2/verification-20261020/`。S2-01 已通过主模型审核并完成本地提交；其验收结果不代表 S2-02 已通过。
+
+## S2-02 实现与验收（2026-10-20；主模型审核 PASS）
+
+Builder 可在被选后的 `AWAITING_BUILDER` 状态创建并模拟成功固定本地 ¥1.00 Mock 押金；成功后服务端事务将项目推进到 `IN_PROGRESS`、选中申请推进到 `ENGAGED`，并将其他仍为 `SUBMITTED` 的申请推进到 `REJECTED`。Milestone 从锁定公开 Spec 初始化，首个为 `IN_PROGRESS`，其余为 `PENDING`；截止时间以共同的 `started_at` UTC epoch 加累计 `dueAfterDays × 86400` 秒计算。共享 `/projects/[projectId]/workspace` 只向项目企业和当前已开工的选中 Builder 返回公开标题、开始时间、里程碑、截止日、交付物及验收标准/验证方法；其他参与者收到 404，不返回原始需求、AIPM 私有对话、私有 Spec 或付款明细。Workspace 本轮不包含 S3 的成果提交、审核或最终验收能力；Mock 付款不代表真实收付或合同接受。
+
+完整 production E2E 从申请和企业选择开始，由 Builder 实际创建并模拟成功押金，再验证双方 Workspace、非参与者 404、刷新后的状态与 390px 布局。测试起始夹具只为已发布项目准备企业成功定金，不预置 Builder 付款、`ENGAGED`、`IN_PROGRESS` 或 Milestone。
+
+本轮实际验证：
+
+- `corepack pnpm typecheck`、`corepack pnpm lint`：通过；两项在 E2E 后以非 CI 环境运行，未触发依赖重建。
+- `corepack pnpm test`：100/100 unit 通过。
+- 串行 PostgreSQL/Auth integration：11 个文件，127/127 通过。Builder 开工 targeted integration 最终 3/3 通过；首次 2/3 是 Drizzle error `cause` 断言层级不匹配，修正后通过。
+- `db:prepare`：exit 0，待应用 migration 列表为空；未执行 `db:reset`。
+- `CI=1 corepack pnpm test:e2e`：fresh production build/start 上 17/17 通过，exit 0（约 1.7 分钟）。Next app paths manifest 共 15 项：13 个产品路由、2 个内部错误路由（`/_global-error/page`、`/_not-found/page`）。
+
+最终 E2E 命令输出、exit、Playwright 状态和产品/内部路由计数保存在忽略目录 `artifacts/ui-parity/s2-02/verification-20261020/full-production-e2e.log`、`full-production-e2e-exit.txt`、`full-production-e2e.last-run.json` 和 `production-route-count.txt`。前两次完整运行因断言仍使用旧阶段/页面文案而失败，修正文本匹配后最终 17/17 通过；两份失败日志与上下文保存在 `failed-first/` 和 `failed-second/`，作为保留的负结果。首次 CI 环境运行触发 pnpm `Recreating node_modules`，随后 `corepack pnpm install --frozen-lockfile --force` 恢复成功且未改 lockfile；安装输出和首次重建记录保存在同目录。仓库已在 `pnpm-workspace.yaml` 显式设置 `enableGlobalVirtualStore: false`，背景与引用见根 README 的 pnpm 运行说明。
+
+实现、本地验收与主模型审核已通过；提交 `d1a3453`、`8e80bbf` 已发布至 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)（base `main`），尚未合并；发布时尚无 GitHub 评审结论。平台与 AIPM 仍由同一项目团队端到端负责；Spec 可见性、报价、价格模式、选择后二次接受仍是 Pending Product Decisions。S3 成果提交、逐条验收与项目完成状态不属于本任务。
 
 ## PR #2 / PR #3 基线衔接（2026-10-15）
 
@@ -20,7 +58,7 @@ PR #3 已更新为 base `main`。在 2026-10-15 衔接提交 `42e692a` 时，bas
 
 PR #2 准确 head 的基线验证：typecheck、lint 通过；87 个 unit 与 115 个 integration 用例通过；production build 输出 11 个 routes；5/5 production E2E 通过。使用的是与 PR #2 package/lock 直接依赖版本一致的本地已安装二进制，没有重建全新 frozen install。原 E2E 的 3 个 Builder 失败来自本地 seeded `builder@qianzo.local` 实际为 ACTIVE 双角色；仅在测试窗口移除额外 ENTERPRISE 行后 5 例通过，并按备份精确恢复角色、状态及 `created_at`。初次失败、5/5通过记录和恢复备份保存在 ignored `artifacts/ui-parity/merge-verification-20261015/pr2/`；之后 PR #2 的 10 条已核验 review thread 均标记 resolved。
 
-截至 2026-10-15 的记录，本分支 PR #3 完整验证及新增回归见下文，当时尚未合并 PR #3。没有 `db:reset`。S2 仍未开始。
+截至 2026-10-15 的记录，本分支 PR #3 完整验证及新增回归见下文，当时尚未合并 PR #3。没有 `db:reset`。S2 后续实施状态见本文档顶部与 S2-02 当前实施记录。
 
 ## PR #3 复审补充（2026-10-20）
 
@@ -50,7 +88,7 @@ PR #3 的新意见在该记录时仍保持远端未解决状态；以下本地�
 
 复用检查：参考 [React 官方渲染列表与 key 文档源码](https://github.com/reactjs/react.dev/blob/main/src/content/learn/rendering-lists.md)，没有找到需要引入的外部实现；按当前静态有序列表使用序号 key，不复制代码或引入依赖。实现前还阅读了本地 Next.js 16.3.5 `data-security.md`、`server-actions.md` 与 `Link` 文档，依据 RSC/Flight 序列化边界加原始载荷回归；未采用外部框架或测试基础设施。
 
-本轮没有 push、创建 PR、评论或关闭 GitHub 线程，也没有 merge。S2 等待更新既有 PR、用户授权合并及合并基线复验；PR #2/#3 的合并依赖及次序保持不变。
+本轮复审阶段没有 push、创建 PR、评论或关闭 GitHub 线程，也没有 merge；当时下一步仍是开始 S2。此后状态见本文档顶部的 S2-02 当前实施记录。PR #2/#3 的合并依赖及次序保持不变。
 
 ## Codex 评审修复历史记录（2026-10-02，按当时状态）
 
@@ -173,14 +211,14 @@ S1-06 的验收与文档提交见 `eb38dc6`。
 - **当时待拍板、现已落地**：UI 技术栈。存档文档推荐 Tailwind v4 + shadcn/ui（本项目 RSC/client 边界早已落在 11 个表单上，故组件库的边际客户端渗透为零），回退方案为纯 CSS Modules；MUI 会把全局导航壳推向客户端、并有诱发取数下沉的风险；Ant Design 因 `<Form>` 自管字段、不写入原生 `FormData`，会直接打断 `formData.get` 契约，已排除。
 - 本节为历史评估记录：其「未开工 / 待拍板」状态随后由 2026-09-25 的 UI 接入完成——技术栈最终采用 Tailwind v4 + Radix Slot + CVA，且 `src/modules/**`、`src/platform/**` 与 migration 均未改动，见下节「Qianzo Flow UI 接入」。
 
-## 已知限制与交接
+## 已知限制与交接（更新至 2026-10-20）
 
 - 当前是本地合成数据演示，不是生产部署；没有 CI、备份、生产监控或用户级 RLS。
-- S1 到达「项目已 OPEN、其他登录用户可评估」为止，**不是完整交易闭环**：申请、选择、Builder 押金与开工均未开始（S2）。
+- S2-01 已实现 Builder 申请与企业选择，项目选择后进入 `AWAITING_BUILDER`；S2-02 的 Builder Mock 押金、开工和只读 Workspace 已通过本轮本地验证。S3 的成果提交与验收尚未实现，因此端到端交付链仍未完成。
 - S1 不提供解锁、下架、重新发布或修改已公开内容；已发布快照、锁定范围与 Spec 历史都不可改写。
 - Mock 定金与 Mock AIPM 都不代表真实收付、真实模型或合同接受；演示金额为固定 fixture，不是已确定的定金标准。
 - Spec 可见性细则、报价能力、价格模式与选择后二次接受仍是 Pending Product Decisions。
-- 下一 Slice 是 S2；开工需要新的明确授权，不要自行开始。
+- S2-02 本地实现、验收与主模型审核均已通过；S3 成果提交、逐条验收与项目完成状态仍属后续 Slice。
 
 ---
 

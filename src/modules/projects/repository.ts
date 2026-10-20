@@ -70,6 +70,8 @@ type ProjectRow = {
   locked_at: Date | null;
   published_spec_snapshot: unknown;
   published_at: Date | null;
+  selected_application_id: string | null;
+  started_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -90,6 +92,8 @@ function toProject(row: ProjectRow): Project {
     lockedAt: row.locked_at,
     publishedSpecSnapshot: row.published_spec_snapshot,
     publishedAt: row.published_at,
+    selectedApplicationId: row.selected_application_id,
+    startedAt: row.started_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -113,6 +117,7 @@ export async function createProjectWithDatabase(
       returning id, owner_id, title, original_requirement, status, version,
         current_spec_version_id, budget_min_minor, budget_max_minor, currency,
         locked_spec_version_id, locked_at, published_spec_snapshot, published_at,
+        selected_application_id, started_at,
         created_at, updated_at
     `);
     const created = inserted[0];

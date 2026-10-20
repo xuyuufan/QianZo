@@ -14,7 +14,7 @@ type ProjectFilter = "all" | "draft" | "open";
 const filters: { value: ProjectFilter; label: string }[] = [
   { value: "all", label: "全部" },
   { value: "draft", label: "草稿" },
-  { value: "open", label: "等待开发者" },
+  { value: "open", label: "招募与进行中" },
 ];
 
 const dateParts = new Intl.DateTimeFormat("zh-CN", {
@@ -44,12 +44,12 @@ export default async function EnterpriseProjectsPage({
   const counts: Record<ProjectFilter, number> = {
     all: projectList.length,
     draft: projectList.filter((project) => project.status === "DRAFT").length,
-    open: projectList.filter((project) => project.status === "OPEN").length,
+    open: projectList.filter((project) => project.status === "OPEN" || project.status === "AWAITING_BUILDER" || project.status === "IN_PROGRESS").length,
   };
   const visibleProjects = projectList.filter((project) =>
     selectedFilter === "all"
     || (selectedFilter === "draft" && project.status === "DRAFT")
-    || (selectedFilter === "open" && project.status === "OPEN"),
+    || (selectedFilter === "open" && (project.status === "OPEN" || project.status === "AWAITING_BUILDER" || project.status === "IN_PROGRESS")),
   );
 
   return (
@@ -105,29 +105,41 @@ export default async function EnterpriseProjectsPage({
             <ul className="divide-y divide-border border-b border-border">
               {visibleProjects.map((project) => {
                 const isOpen = project.status === "OPEN";
-                const specHint = isOpen
+                const isAwaitingBuilder = project.status === "AWAITING_BUILDER";
+                const isInProgress = project.status === "IN_PROGRESS";
+                const specHint = isOpen || isAwaitingBuilder || isInProgress
                   ? "Spec 已确认"
                   : project.currentSpecVersionId
                     ? "Spec 已有版本"
                     : "Spec 待整理";
                 return (
                   <li key={project.id}>
-                    <Link
-                      href={`/enterprise/projects/${project.id}`}
-                      className="group grid items-center gap-4 py-5 transition-colors hover:bg-card sm:grid-cols-[minmax(0,1fr)_150px_140px_90px_20px] sm:px-3"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate font-zh text-sm font-normal text-foreground">{project.title || "未命名项目"}</span>
-                        <span className="mt-1 block truncate font-zh text-xs text-muted-foreground">{project.originalRequirement}</span>
-                      </span>
-                      <span className="flex items-center gap-2 font-zh text-xs text-muted-foreground">
-                        <span className={`size-1.5 rounded-full ${isOpen ? "bg-requester" : "bg-border"}`} />
-                        {isOpen ? "等待开发者" : "草稿"}
-                      </span>
-                      <span className="hidden font-zh text-xs text-muted-foreground sm:block">{specHint}</span>
-                      <span className="hidden text-right font-zh text-xs text-muted-foreground sm:block">{formatUpdatedAt(project.updatedAt)}</span>
-                      <span className="hidden text-right text-sm text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground sm:block" aria-hidden="true">→</span>
-                    </Link>
+                    <div className="grid items-center gap-1 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <Link
+                        href={`/enterprise/projects/${project.id}`}
+                        className="group grid items-center gap-4 py-5 transition-colors hover:bg-card sm:grid-cols-[minmax(0,1fr)_150px_140px_90px_20px] sm:px-3"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-zh text-sm font-normal text-foreground">{project.title || "未命名项目"}</span>
+                          <span className="mt-1 block truncate font-zh text-xs text-muted-foreground">{project.originalRequirement}</span>
+                        </span>
+                        <span className="flex items-center gap-2 font-zh text-xs text-muted-foreground">
+                          <span className={`size-1.5 rounded-full ${isOpen || isAwaitingBuilder || isInProgress ? "bg-requester" : "bg-border"}`} />
+                          {isInProgress ? "进行中" : isAwaitingBuilder ? "等待 Builder Mock 押金" : isOpen ? "等待开发者" : "草稿"}
+                        </span>
+                        <span className="hidden font-zh text-xs text-muted-foreground sm:block">{specHint}</span>
+                        <span className="hidden text-right font-zh text-xs text-muted-foreground sm:block">{formatUpdatedAt(project.updatedAt)}</span>
+                        <span className="hidden text-right text-sm text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground sm:block" aria-hidden="true">→</span>
+                      </Link>
+                      {isInProgress ? (
+                        <Link
+                          href={`/projects/${project.id}/workspace`}
+                          className="px-3 py-2 font-zh text-xs text-foreground underline decoration-border underline-offset-4 hover:text-requester sm:justify-self-end"
+                        >
+                          进入 Workspace →
+                        </Link>
+                      ) : null}
+                    </div>
                   </li>
                 );
               })}
