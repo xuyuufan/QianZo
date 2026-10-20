@@ -66,6 +66,8 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
   const candidateMatchesProjectVersion = latestCandidate?.payload?.adoptableProjectVersion === project.version;
   const editorDocument = current?.document ?? latestProposal ?? emptySpecDraft(project);
   const locked = project.lockedSpecVersionId !== null;
+  const workspaceAvailable = project.status === "IN_PROGRESS" || project.status === "FINAL_REVIEW" || project.status === "COMPLETED";
+  const statusLabel = project.status === "COMPLETED" ? "已完成" : project.status === "FINAL_REVIEW" ? "最终验收" : workspaceAvailable ? "进行中" : project.status === "AWAITING_BUILDER" ? "等待 Builder Mock 押金" : project.status === "OPEN" ? "招募中" : "草稿";
   const budgetLabel = describeBudget(project.budgetMinMinor, project.budgetMaxMinor, project.currency);
   const lockedAt = project.lockedAt ? momentFormat.format(project.lockedAt) : null;
 
@@ -91,20 +93,20 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
             </p>
           </div>
           <div className="grid shrink-0 grid-cols-3 gap-4 font-zh text-xs sm:gap-6 sm:text-right">
-            <span><b className="mb-1 block font-normal text-muted-foreground">项目</b>{project.status === "IN_PROGRESS" ? "进行中" : project.status === "AWAITING_BUILDER" ? "等待 Builder Mock 押金" : project.status === "OPEN" ? "招募中" : "草稿"}</span>
+            <span><b className="mb-1 block font-normal text-muted-foreground">项目</b>{statusLabel}</span>
             <span><b className="mb-1 block font-normal text-muted-foreground">Spec</b>{current ? `当前 Spec 版本 ${current.versionNo}` : "未保存"}</span>
             <span><b className="mb-1 block font-normal text-muted-foreground">范围</b>{locked ? "已锁定" : "编辑中"}</span>
           </div>
         </header>
 
-        {project.status === "IN_PROGRESS" ? (
+        {workspaceAvailable ? (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border border-requester/30 bg-card px-4 py-3">
-            <p className="font-zh text-xs text-muted-foreground" role="status">项目已开工；锁定 Spec 与历史记录继续保留。</p>
+            <p className="font-zh text-xs text-muted-foreground" role="status">{project.status === "COMPLETED" ? "项目已完成；锁定 Spec 与交付验收历史继续保留。" : project.status === "FINAL_REVIEW" ? "全部里程碑已通过；最终确认入口位于 Workspace。" : "项目已开工；锁定 Spec 与历史记录继续保留。"}</p>
             <Link
               href={`/projects/${project.id}/workspace`}
               className="font-zh text-xs text-foreground underline decoration-border underline-offset-4 hover:text-requester"
             >
-              进入 Workspace →
+              {project.status === "COMPLETED" ? "查看交付历史 →" : project.status === "FINAL_REVIEW" ? "最终验收与交付历史 →" : "进入 Workspace →"}
             </Link>
           </div>
         ) : null}

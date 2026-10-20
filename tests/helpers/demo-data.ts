@@ -20,6 +20,14 @@ export async function clearDemoBusinessData(
   }
 
   await sql.begin(async (transaction) => {
+    await transaction`
+      delete from app.submission_reviews
+      where project_id in (select id from app.projects where owner_id in ${transaction(userIds)})
+    `;
+    await transaction`
+      delete from app.submissions
+      where project_id in (select id from app.projects where owner_id in ${transaction(userIds)})
+    `;
     await transaction`delete from app.milestones
       where project_id in (select id from app.projects where owner_id in ${transaction(userIds)})`;
     // Payments reference both the project and, for Builder deposits, the application.

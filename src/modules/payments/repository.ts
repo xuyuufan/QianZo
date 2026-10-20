@@ -84,7 +84,11 @@ async function lockSelectedBuilderContext(
   }
 
   const awaiting = project.status === "AWAITING_BUILDER" && application.status === "SELECTED";
-  const started = project.status === "IN_PROGRESS" && application.status === "ENGAGED";
+  const started =
+    (project.status === "IN_PROGRESS" ||
+      project.status === "FINAL_REVIEW" ||
+      project.status === "COMPLETED") &&
+    application.status === "ENGAGED";
   if ((!awaiting && !started) || (awaiting && project.startedAt) || (started && !project.startedAt)) {
     throw new PaymentError("INVALID_STAGE", "The project is not in a Builder deposit stage.");
   }
@@ -264,7 +268,9 @@ export async function simulateBuilderDepositSuccessWithDatabase(
 
     if (payment.status === "SUCCEEDED") {
       if (
-        context.project.status === "IN_PROGRESS" &&
+        (context.project.status === "IN_PROGRESS" ||
+          context.project.status === "FINAL_REVIEW" ||
+          context.project.status === "COMPLETED") &&
         context.project.startedAt &&
         context.application.status === "ENGAGED"
       ) {
@@ -371,7 +377,11 @@ export async function getBuilderDepositWithDatabase(
     application.builderId !== actor.id ||
     !(
       (project.status === "AWAITING_BUILDER" && application.status === "SELECTED" && !project.startedAt) ||
-      (project.status === "IN_PROGRESS" && application.status === "ENGAGED" && project.startedAt)
+      ((project.status === "IN_PROGRESS" ||
+        project.status === "FINAL_REVIEW" ||
+        project.status === "COMPLETED") &&
+        application.status === "ENGAGED" &&
+        project.startedAt)
     )
   ) {
     return null;
@@ -389,7 +399,10 @@ export async function getBuilderDepositWithDatabase(
     )
     .limit(1);
   if (payment && payment.payerId !== actor.id) return null;
-  if (project.status === "IN_PROGRESS" && (!payment || payment.status !== "SUCCEEDED")) {
+  if (
+    (project.status === "IN_PROGRESS" || project.status === "FINAL_REVIEW" || project.status === "COMPLETED") &&
+    (!payment || payment.status !== "SUCCEEDED")
+  ) {
     throw new PaymentError("INVALID_STAGE", "The started project is missing its successful deposit.");
   }
 

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, type SQL } from "drizzle-orm";
 
 import type { Database } from "@/platform/db/client";
 import { projects } from "@/platform/db/schema";
@@ -37,10 +37,36 @@ export async function withProjectLock<T>(
   errors: ProjectLockErrors,
   fn: (project: Project) => Promise<T>,
 ): Promise<T> {
+  return lockProject(
+    executor,
+    and(eq(projects.id, params.projectId), eq(projects.ownerId, params.ownerId))!,
+    params.expectedVersion,
+    errors,
+    fn,
+  );
+}
+
+/** Locks a project for a participant action whose relationship is checked after the lock. */
+export async function withProjectRowLock<T>(
+  executor: ProjectLockExecutor,
+  projectId: string,
+  errors: ProjectLockErrors,
+  fn: (project: Project) => Promise<T>,
+): Promise<T> {
+  return lockProject(executor, eq(projects.id, projectId), undefined, errors, fn);
+}
+
+async function lockProject<T>(
+  executor: ProjectLockExecutor,
+  where: SQL,
+  expectedVersion: number | undefined,
+  errors: ProjectLockErrors,
+  fn: (project: Project) => Promise<T>,
+): Promise<T> {
   const [project] = await executor
     .select()
     .from(projects)
-    .where(and(eq(projects.id, params.projectId), eq(projects.ownerId, params.ownerId)))
+    .where(where)
     .limit(1)
     .for("update");
 
@@ -52,8 +78,8 @@ export async function withProjectLock<T>(
   }
   if (
     errors.versionConflict &&
-    params.expectedVersion !== undefined &&
-    project.version !== params.expectedVersion
+    expectedVersion !== undefined &&
+    project.version !== expectedVersion
   ) {
     throw errors.versionConflict();
   }

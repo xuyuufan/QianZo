@@ -7,6 +7,9 @@ import { projectIdSchema } from "@/modules/projects/validation";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
 import { ProjectHeader, projectHeaderRoles } from "@/app/enterprise/projects/project-header";
+import { SubmissionForm } from "./submission-form";
+import { ReviewForm } from "./review-form";
+import { CompleteForm } from "./complete-form";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +42,11 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
   const role = workspace.viewerRole === "owner" ? "requester" : "builder";
   const homeHref = workspace.viewerRole === "owner" ? "/enterprise/projects" : "/builder/applications";
   const backLabel = workspace.viewerRole === "owner" ? "返回项目列表" : "返回我的申请";
+  const projectStatusLabel = workspace.status === "COMPLETED"
+    ? "已完成"
+    : workspace.status === "FINAL_REVIEW"
+      ? "最终验收"
+      : "进行中";
 
   return (
     <div className="qz-paper min-h-[100svh]">
@@ -63,8 +71,9 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
             </p>
           </div>
           <div className="shrink-0 font-zh text-xs text-muted-foreground sm:text-right">
-            <p>项目状态 · 进行中</p>
+            <p>项目状态 · {projectStatusLabel}</p>
             <p className="mt-2">开工于 {dateTimeFormat.format(new Date(workspace.startedAt))}</p>
+            {workspace.completedAt ? <p className="mt-2">完成于 {dateTimeFormat.format(new Date(workspace.completedAt))}</p> : null}
           </div>
         </header>
 
@@ -85,7 +94,11 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
                   <div className="flex flex-wrap items-center gap-3">
                     <h3 className="font-zh text-sm">{milestone.title}</h3>
                     <span className="font-zh text-[11px] text-muted-foreground">
-                      {milestone.status === "IN_PROGRESS" ? "进行中" : "待开始"}
+                      {milestone.status === "PENDING" ? "待开始"
+                        : milestone.status === "IN_PROGRESS" ? "进行中"
+                          : milestone.status === "IN_REVIEW" ? "待验收"
+                            : milestone.status === "REVISION" ? "需返工"
+                              : "已通过"}
                     </span>
                   </div>
                   <p className="mt-2 whitespace-pre-wrap font-zh text-sm leading-6 text-muted-foreground">{milestone.description}</p>
@@ -123,6 +136,66 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
                       )}
                     </section>
                   </div>
+
+                  <section className="mt-6 border-t border-border pt-4" aria-label={`${milestone.title}交付历史`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h4 className="font-zh text-xs">成果与验收历史</h4>
+                      <span className="font-zh text-[11px] text-muted-foreground">{milestone.submissions.length} 次提交</span>
+                    </div>
+                    {milestone.submissions.length === 0 ? (
+                      <p className="mt-3 font-zh text-xs text-muted-foreground">还没有提交成果。</p>
+                    ) : (
+                      <ol className="mt-3 grid gap-4">
+                        {milestone.submissions.map((submission) => (
+                          <li key={submission.id} className="rounded-sm border border-border p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <h5 className="font-zh text-xs">第 {submission.sequence} 次提交</h5>
+                              <time dateTime={submission.createdAt} className="font-zh text-[11px] text-muted-foreground">{dateTimeFormat.format(new Date(submission.createdAt))}</time>
+                            </div>
+                            <p className="mt-3 break-words whitespace-pre-wrap font-zh text-sm leading-6 text-muted-foreground">{submission.summary}</p>
+                            <ul className="mt-3 grid gap-2">
+                              {submission.links.map((url, index) => (
+                                <li key={index} className="min-w-0">
+                                  <a href={url} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-xs text-foreground underline decoration-border underline-offset-4 hover:text-builder">{url}</a>
+                                </li>
+                              ))}
+                            </ul>
+                            {submission.review ? (
+                              <div className="mt-4 border-t border-border pt-3">
+                                <p className="font-zh text-xs">验收结果 · {submission.review.outcome}</p>
+                                <ol className="mt-2 grid gap-2">
+                                  {submission.review.criteriaResults.map((result) => (
+                                    <li key={result.position} className="font-zh text-xs text-muted-foreground">
+                                      第 {result.position} 项 · {result.outcome}
+                                      {milestone.acceptanceCriteria[result.position - 1]
+                                        ? ` — ${milestone.acceptanceCriteria[result.position - 1].description}`
+                                        : ""}
+                                    </li>
+                                  ))}
+                                </ol>
+                                {submission.review.reason ? <p className="mt-3 break-words whitespace-pre-wrap font-zh text-xs leading-5 text-muted-foreground">返工原因：{submission.review.reason}</p> : null}
+                              </div>
+                            ) : null}
+                            {workspace.viewerRole === "owner" && milestone.status === "IN_REVIEW" && milestone.currentSubmissionId === submission.id ? (
+                              <ReviewForm
+                                projectId={workspace.projectId}
+                                milestoneId={milestone.id}
+                                submissionId={submission.id}
+                                criteria={milestone.acceptanceCriteria}
+                              />
+                            ) : null}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                    {workspace.viewerRole === "builder" && workspace.status === "IN_PROGRESS" && (milestone.status === "IN_PROGRESS" || milestone.status === "REVISION") ? (
+                      <SubmissionForm
+                        projectId={workspace.projectId}
+                        milestoneId={milestone.id}
+                        currentSubmissionId={milestone.currentSubmissionId}
+                      />
+                    ) : null}
+                  </section>
                 </div>
                 <time dateTime={milestone.deadline} className="font-zh text-xs text-muted-foreground">
                   计划截止 {dateFormat.format(new Date(milestone.deadline))}
@@ -131,6 +204,15 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
             ))}
           </ol>
         </section>
+        {workspace.viewerRole === "owner" && workspace.status === "FINAL_REVIEW" ? (
+          <section className="mt-8 border border-requester/30 bg-card p-5 sm:p-6" aria-labelledby="workspace-final-review-title">
+            <p className="font-brand text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Final review</p>
+            <h2 id="workspace-final-review-title" className="mt-2 font-zh text-lg">最终验收</h2>
+            <CompleteForm projectId={workspace.projectId} />
+          </section>
+        ) : workspace.status === "COMPLETED" ? (
+          <p className="mt-8 border border-requester/30 bg-card px-5 py-4 font-zh text-sm" role="status">项目已完成；全部提交与验收历史仍可查看。</p>
+        ) : null}
       </main>
     </div>
   );

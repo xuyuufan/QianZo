@@ -196,7 +196,9 @@ test("a Builder applies, the project owner selects them, and private application
     const builderReturnLink = page.getByRole("link", { name: "返回我的申请" });
     await expect(builderReturnLink).toHaveAttribute("href", "/builder/applications");
     await expect(page.getByText(/PRIVATE-S2 原始需求/)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /提交成果|验收/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "提交成果链接" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "保存验收结果" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "确认最终验收并完成项目" })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
       await page.evaluate(() => document.documentElement.clientWidth),
     );
