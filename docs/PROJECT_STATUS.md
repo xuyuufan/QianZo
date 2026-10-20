@@ -2,7 +2,7 @@
 
 更新时间：2026-10-20（S2-02 实现、本地验收与主模型审核 PASS）
 
-当前分支：`codex/s2-applications`，从已同步的 `main` 基线 `185fd06d99a8de092963bd94b22dd38e5668a6bc` 创建。PR #2/#3 已合并；S2-01 已通过主模型审核并本地提交，尚未推送。S2-02 的前端、服务、迁移、E2E 与文档已在同一工作区完成并通过主模型审核；本地提交随本次变更创建，具体见 `git log`。
+当前分支：`codex/s2-applications`，基于已同步的 `main` `185fd06d99a8de092963bd94b22dd38e5668a6bc`。PR #2/#3 已合并。S2-01 提交 `d1a3453` 与 S2-02 提交 `8e80bbf` 已发布为 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)，base 为 `main`，尚未合并；发布时尚无 GitHub 评审结论或远端 CI 结果。
 
 远端基线：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) merge commit `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) merge commit `185fd06d99a8de092963bd94b22dd38e5668a6bc`。合并后的 main tree 为 `a62f4dd3907513faead7a42039ecbce4a96aac36`，与 PR #3 最终修复 head `126848a` 的 tree 相同；本次复核 `git diff --exit-code 126848a origin/main` 返回 0。
 
@@ -30,7 +30,7 @@ Builder 可在被选后的 `AWAITING_BUILDER` 状态创建并模拟成功固定�
 
 最终 E2E 命令输出、exit、Playwright 状态和产品/内部路由计数保存在忽略目录 `artifacts/ui-parity/s2-02/verification-20261020/full-production-e2e.log`、`full-production-e2e-exit.txt`、`full-production-e2e.last-run.json` 和 `production-route-count.txt`。前两次完整运行因断言仍使用旧阶段/页面文案而失败，修正文本匹配后最终 17/17 通过；两份失败日志与上下文保存在 `failed-first/` 和 `failed-second/`，作为保留的负结果。首次 CI 环境运行触发 pnpm `Recreating node_modules`，随后 `corepack pnpm install --frozen-lockfile --force` 恢复成功且未改 lockfile；安装输出和首次重建记录保存在同目录。仓库已在 `pnpm-workspace.yaml` 显式设置 `enableGlobalVirtualStore: false`，背景与引用见根 README 的 pnpm 运行说明。
 
-实现、本地验收与主模型审核已通过；本地提交随本次变更创建，具体见 `git log`。平台与 AIPM 仍由同一项目团队端到端负责；Spec 可见性、报价、价格模式、选择后二次接受仍是 Pending Product Decisions。S3 成果提交、逐条验收与项目完成状态不属于本任务。
+实现、本地验收与主模型审核已通过；提交 `d1a3453`、`8e80bbf` 已发布至 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)（base `main`），尚未合并；发布时尚无 GitHub 评审结论。平台与 AIPM 仍由同一项目团队端到端负责；Spec 可见性、报价、价格模式、选择后二次接受仍是 Pending Product Decisions。S3 成果提交、逐条验收与项目完成状态不属于本任务。
 
 ## PR #2 / PR #3 基线衔接（2026-10-15）
 

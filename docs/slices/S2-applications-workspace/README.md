@@ -27,7 +27,7 @@ S2-02 仅允许当前选中的 Builder 在 `AWAITING_BUILDER` 阶段创建及模
 
 ## S2-01 验收记录
 
-实现、本地验收与主模型审核均已通过；本地提交已创建，尚未推送。迁移 `20261020000000_s2_applications.sql` 已通过 `db:prepare` 应用，未执行 `db:reset`。运行时仅能读取申请所需数据、插入明确列并更新获准状态/项目指针；浏览器没有 `app` schema 访问权限，授权由服务端和数据库最小权限共同执行，不宣称用户级 RLS。
+实现、本地验收与主模型审核均已通过；S2-01 本地提交已创建，并随当前分支发布至 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)（base `main`），尚未合并；发布时尚无 GitHub 评审结论。迁移 `20261020000000_s2_applications.sql` 已通过 `db:prepare` 应用，未执行 `db:reset`。运行时仅能读取申请所需数据、插入明确列并更新获准状态/项目指针；浏览器没有 `app` schema 访问权限，授权由服务端和数据库最小权限共同执行，不宣称用户级 RLS。
 
 - `corepack pnpm typecheck`、`corepack pnpm lint`：通过。
 - `corepack pnpm test`：12 个文件，100/100 通过。
@@ -42,4 +42,4 @@ S2-01 的 E2E 命令输出、退出码与 Playwright 状态记录保存在本地
 
 本轮验证结果：`typecheck`、`lint` 均通过；unit 100/100 通过；串行 PostgreSQL/Auth integration 11 个文件、127/127 通过；Builder 开工 targeted integration 最终 3/3 通过。`db:prepare` exit 0，待应用列表为空，未执行 `db:reset`。fresh production build/start 上完整 E2E 为 17/17，exit 0（约 1.7 分钟）；manifest 共 15 项，其中 13 个产品路由、2 个内部错误路由。完整日志、退出码、Playwright 状态和路由清单在忽略目录 `artifacts/ui-parity/s2-02/verification-20261020/`。首次 targeted integration 中一条失败是 Drizzle 错误 `cause` 的断言层级，修正后 3/3 通过。两次早期完整 E2E 只因旧界面文案断言不匹配而失败，完整负结果保存在 `failed-first/` 与 `failed-second/`；修正断言后最终整套通过。pnpm 在切换 CI 环境时触发依赖目录重建，随后以 `corepack pnpm install --frozen-lockfile --force` 恢复成功，lockfile 未改；安装记录也在该忽略目录。
 
-实现、本地验收与主模型审核均已通过；本地提交随本次变更创建，具体见 `git log`。S3 的成果提交、逐条验收与项目完成状态不属于本任务。
+实现、本地验收与主模型审核均已通过；S2-01/S2-02 提交已发布至 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)（base `main`），尚未合并；发布时尚无 GitHub 评审结论。S3 的成果提交、逐条验收与项目完成状态不属于本任务。
