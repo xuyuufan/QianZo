@@ -150,7 +150,7 @@ afterAll(async () => {
 });
 
 describeRebuild("migration chain rebuilt on an empty scratch database", () => {
-  it("creates exactly the nine business tables needed by implemented slices", async () => {
+  it("creates exactly the eleven business tables needed by implemented slices", async () => {
     const tables = await scratch<{ table_name: string }[]>`
       select table_name
       from information_schema.tables
@@ -165,6 +165,8 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
       "payments",
       "projects",
       "spec_versions",
+      "submission_reviews",
+      "submissions",
       "user_roles",
       "users",
     ]);
@@ -197,9 +199,11 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
 
     const deferrable = constraints.filter((constraint) => constraint.condeferrable);
     expect(deferrable.map((constraint) => constraint.conname)).toEqual([
+      "milestones_current_submission_fk",
       "projects_current_spec_version_fk",
       "projects_locked_spec_version_fk",
       "projects_selected_application_fk",
+      "submissions_project_milestone_fk",
     ]);
     for (const constraint of deferrable) {
       expect(constraint.condeferred).toBe(true);
@@ -233,6 +237,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
     expect(await updateColumns("projects")).toEqual([
       "budget_max_minor",
       "budget_min_minor",
+      "completed_at",
       "currency",
       "current_spec_version_id",
       "locked_at",
@@ -252,7 +257,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
 
     expect(await updateColumns("payments")).toEqual(["status", "succeeded_at", "updated_at"]);
     expect(await updateColumns("applications")).toEqual(["status", "updated_at"]);
-    expect(await updateColumns("milestones")).toEqual([]);
+    expect(await updateColumns("milestones")).toEqual(["current_submission_id", "status"]);
     const insertColumns = await scratch<{ column_name: string }[]>`
       select column_name
       from information_schema.column_privileges
@@ -269,6 +274,39 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
       "spec_version_id",
       "statement",
     ]);
+
+    const historyInsertColumns = async (table: string) =>
+      (
+        await scratch<{ column_name: string }[]>`
+          select column_name
+          from information_schema.column_privileges
+          where grantee = 'qianzo_runtime'
+            and table_schema = 'app'
+            and table_name = ${table}
+            and privilege_type = 'INSERT'
+          order by column_name
+        `
+      ).map((row) => row.column_name);
+    expect(await historyInsertColumns("submissions")).toEqual([
+      "builder_id",
+      "id",
+      "links",
+      "milestone_id",
+      "project_id",
+      "sequence",
+      "submission_key",
+      "summary",
+    ]);
+    expect(await historyInsertColumns("submission_reviews")).toEqual([
+      "criteria_results",
+      "id",
+      "milestone_id",
+      "outcome",
+      "project_id",
+      "reason",
+      "reviewer_id",
+      "submission_id",
+    ]);
   });
 
   it("keeps the append-only history free of runtime update, delete or insert escape hatches", async () => {
@@ -277,7 +315,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
       from information_schema.column_privileges
       where grantee = 'qianzo_runtime'
         and table_schema = 'app'
-        and table_name in ('aipm_sessions', 'aipm_messages', 'spec_versions')
+        and table_name in ('aipm_sessions', 'aipm_messages', 'spec_versions', 'submissions', 'submission_reviews')
         and privilege_type = 'UPDATE'
     `;
     expect(updateColumns).toEqual([]);
@@ -290,6 +328,16 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
         and privilege_type = 'DELETE'
     `;
     expect(deletions).toEqual([]);
+
+    const historyUpdates = await scratch<{ table_name: string; column_name: string }[]>`
+      select table_name, column_name
+      from information_schema.column_privileges
+      where grantee = 'qianzo_runtime'
+        and table_schema = 'app'
+        and table_name in ('submissions', 'submission_reviews')
+        and privilege_type = 'UPDATE'
+    `;
+    expect(historyUpdates).toEqual([]);
 
     // Server-controlled columns stay out of the runtime role's INSERT reach.
     const paymentInsertColumns = (

@@ -74,6 +74,7 @@ export const projects = appSchema.table(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     selectedApplicationId: uuid("selected_application_id"),
     startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -92,7 +93,7 @@ export const projects = appSchema.table(
     ),
     check(
       "projects_status_check",
-      sql`${table.status} in ('DRAFT', 'OPEN', 'AWAITING_BUILDER', 'IN_PROGRESS')`,
+      sql`${table.status} in ('DRAFT', 'OPEN', 'AWAITING_BUILDER', 'IN_PROGRESS', 'FINAL_REVIEW', 'COMPLETED')`,
     ),
     check("projects_version_check", sql`${table.version} > 0`),
     index("projects_owner_created_at_idx").on(table.ownerId, table.createdAt.desc()),
@@ -271,6 +272,9 @@ export const milestones = appSchema.table(
     acceptanceCriteria: jsonb("acceptance_criteria").notNull(),
     status: text("status").notNull(),
     deadline: timestamp("deadline", { withTimezone: true }).notNull(),
+    // The migration declares a deferrable composite FK to submissions because
+    // submissions also point back to their owning milestone.
+    currentSubmissionId: uuid("current_submission_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -280,6 +284,7 @@ export const milestones = appSchema.table(
       foreignColumns: [specVersions.projectId, specVersions.id],
     }).onDelete("restrict"),
     unique("milestones_project_position_unique").on(table.projectId, table.position),
+    unique("milestones_project_id_unique").on(table.projectId, table.id),
     unique("milestones_project_spec_milestone_unique").on(table.projectId, table.specMilestoneId),
     check("milestones_position_check", sql`${table.position} > 0`),
     check(
@@ -292,7 +297,72 @@ export const milestones = appSchema.table(
       "milestones_acceptance_criteria_check",
       sql`jsonb_typeof(${table.acceptanceCriteria}) = 'array' and jsonb_array_length(${table.acceptanceCriteria}) between 1 and 20`,
     ),
-    check("milestones_status_check", sql`${table.status} in ('PENDING', 'IN_PROGRESS')`),
+    check(
+      "milestones_status_check",
+      sql`${table.status} in ('PENDING', 'IN_PROGRESS', 'IN_REVIEW', 'REVISION', 'APPROVED')`,
+    ),
+  ],
+);
+
+export const submissions = appSchema.table(
+  "submissions",
+  {
+    id: uuid("id").primaryKey(),
+    projectId: uuid("project_id").notNull(),
+    milestoneId: uuid("milestone_id").notNull(),
+    builderId: uuid("builder_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    sequence: integer("sequence").notNull(),
+    submissionKey: uuid("submission_key").notNull(),
+    summary: text("summary").notNull(),
+    links: jsonb("links").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: "submissions_project_milestone_fk",
+      columns: [table.projectId, table.milestoneId],
+      foreignColumns: [milestones.projectId, milestones.id],
+    }).onDelete("no action"),
+    unique("submissions_project_id_unique").on(table.projectId, table.id),
+    unique("submissions_project_milestone_id_unique").on(table.projectId, table.milestoneId, table.id),
+    unique("submissions_milestone_sequence_unique").on(table.milestoneId, table.sequence),
+    unique("submissions_milestone_key_unique").on(table.milestoneId, table.submissionKey),
+    check("submissions_sequence_check", sql`${table.sequence} > 0`),
+    check(
+      "submissions_links_check",
+      sql`jsonb_typeof(${table.links}) = 'array' and jsonb_array_length(${table.links}) between 1 and 10`,
+    ),
+  ],
+);
+
+export const submissionReviews = appSchema.table(
+  "submission_reviews",
+  {
+    id: uuid("id").primaryKey(),
+    projectId: uuid("project_id").notNull(),
+    milestoneId: uuid("milestone_id").notNull(),
+    submissionId: uuid("submission_id").notNull().unique(),
+    reviewerId: uuid("reviewer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    outcome: text("outcome").notNull(),
+    criteriaResults: jsonb("criteria_results").notNull(),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: "submission_reviews_submission_fk",
+      columns: [table.projectId, table.milestoneId, table.submissionId],
+      foreignColumns: [submissions.projectId, submissions.milestoneId, submissions.id],
+    }).onDelete("restrict"),
+    check("submission_reviews_outcome_check", sql`${table.outcome} in ('PASS', 'FAIL')`),
+    check(
+      "submission_reviews_criteria_check",
+      sql`jsonb_typeof(${table.criteriaResults}) = 'array' and jsonb_array_length(${table.criteriaResults}) between 1 and 20`,
+    ),
   ],
 );
 
@@ -302,4 +372,12 @@ export type AipmMessageRole = "USER" | "ASSISTANT";
 export type PaymentStatus = "PENDING" | "SUCCEEDED";
 export type PaymentPurpose = "ENTERPRISE_DEPOSIT" | "BUILDER_DEPOSIT";
 export type ApplicationStatus = "SUBMITTED" | "SELECTED" | "ENGAGED" | "REJECTED";
-export type MilestoneStatus = "PENDING" | "IN_PROGRESS";
+export type MilestoneStatus = "PENDING" | "IN_PROGRESS" | "IN_REVIEW" | "REVISION" | "APPROVED";
+export type ProjectStatus =
+  | "DRAFT"
+  | "OPEN"
+  | "AWAITING_BUILDER"
+  | "IN_PROGRESS"
+  | "FINAL_REVIEW"
+  | "COMPLETED";
+export type SubmissionReviewOutcome = "PASS" | "FAIL";

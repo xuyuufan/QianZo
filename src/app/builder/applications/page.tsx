@@ -62,8 +62,12 @@ export default async function BuilderApplicationsPage() {
                     ? "未被选择"
                     : application.projectStatus === "AWAITING_BUILDER"
                       ? "申请仍在提交状态 · 项目已进入等待 Builder 阶段"
-                      : application.projectStatus === "IN_PROGRESS"
+                    : application.projectStatus === "IN_PROGRESS"
                         ? "项目已开工，当前申请未被选择"
+                        : application.projectStatus === "FINAL_REVIEW"
+                          ? "项目正在进行最终验收，当前申请未被选择"
+                          : application.projectStatus === "COMPLETED"
+                            ? "项目已完成，当前申请未被选择"
                         : "等待企业选择";
               return (
                 <li key={application.applicationId} className="rounded-md border border-border bg-card p-5 sm:p-6">
@@ -79,7 +83,11 @@ export default async function BuilderApplicationsPage() {
                   <p className="mt-4 whitespace-pre-wrap border-t border-border pt-4 font-zh text-sm leading-6 text-muted-foreground">{application.statement}</p>
                   <p className="mt-4 font-zh text-[11px] leading-5 text-muted-foreground">
                     {engaged
-                      ? "项目已开工；Workspace 只展示公开标题和锁定 Spec 派生的里程碑。"
+                      ? application.projectStatus === "COMPLETED"
+                        ? "项目已完成；Workspace 保留全部交付和验收历史。"
+                        : application.projectStatus === "FINAL_REVIEW"
+                          ? "项目正在最终验收；Workspace 保留全部交付和验收历史。"
+                          : "项目已开工；Workspace 只展示公开标题和锁定 Spec 派生的里程碑。"
                       : selected
                         ? "企业已选中你；完成固定 Builder 模拟押金后项目才会开工。"
                         : "本页只显示你的申请，不公开项目的私有需求或完整 Spec。"}

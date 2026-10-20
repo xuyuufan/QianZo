@@ -69,33 +69,42 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   // so keying only off `locked` would keep saying "awaiting deposit".
   const paymentState = await getProjectPayment(userId, project.id);
   const depositSucceeded = paymentState?.payment?.status === "SUCCEEDED";
+  const workspaceAvailable = project.status === "IN_PROGRESS" || project.status === "FINAL_REVIEW" || project.status === "COMPLETED";
   const budget = describeBudget(project.budgetMinMinor, project.budgetMaxMinor, project.currency);
   const currency = project.currency ?? DEMO_CURRENCY;
   const statusLabel = project.status === "AWAITING_BUILDER"
     ? "等待 Builder Mock 押金"
-    : project.status === "IN_PROGRESS"
-      ? "进行中"
-    : project.status === "OPEN"
-      ? "招募中"
-      : locked
-        ? "范围已锁定"
-        : "草稿";
+    : project.status === "COMPLETED"
+      ? "已完成"
+      : project.status === "FINAL_REVIEW"
+        ? "最终验收"
+        : project.status === "IN_PROGRESS"
+          ? "进行中"
+          : project.status === "OPEN"
+            ? "招募中"
+            : locked
+              ? "范围已锁定"
+              : "草稿";
   const stageLabel = project.status === "AWAITING_BUILDER"
     ? "已选择 Builder，等待 Mock 押金；尚未开工"
-    : project.status === "IN_PROGRESS"
-      ? "Builder 模拟押金已完成，项目已开工"
-    : project.status === "OPEN"
-      ? "招募已开放"
-    : locked
-      ? depositSucceeded
-        ? "范围已确认，模拟定金已完成，等待发布"
-        : "范围已确认，等待模拟定金"
-      : history.current
-        ? "Spec 已保存，待确认范围"
-        : "需求待整理";
+    : project.status === "COMPLETED"
+      ? "企业已确认最终验收，项目已完成"
+      : project.status === "FINAL_REVIEW"
+        ? "全部里程碑已通过，等待企业最终确认"
+        : project.status === "IN_PROGRESS"
+          ? "Builder 模拟押金已完成，项目已开工"
+          : project.status === "OPEN"
+            ? "招募已开放"
+            : locked
+              ? depositSucceeded
+                ? "范围已确认，模拟定金已完成，等待发布"
+                : "范围已确认，等待模拟定金"
+              : history.current
+                ? "Spec 已保存，待确认范围"
+                : "需求待整理";
   const primaryHref = project.status === "AWAITING_BUILDER"
     ? `/enterprise/projects/${project.id}/applications`
-    : project.status === "IN_PROGRESS"
+    : workspaceAvailable
       ? `/projects/${project.id}/workspace`
     : project.status === "OPEN"
       ? `/projects/${project.id}`
@@ -104,8 +113,8 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       : `/enterprise/projects/${project.id}/spec`;
   const primaryLabel = project.status === "AWAITING_BUILDER"
     ? "查看申请与已选 Builder"
-    : project.status === "IN_PROGRESS"
-      ? "进入 Workspace"
+    : workspaceAvailable
+      ? project.status === "COMPLETED" ? "查看交付历史" : project.status === "FINAL_REVIEW" ? "最终验收与交付历史" : "进入 Workspace"
     : project.status === "OPEN"
       ? "查看招募页"
     : locked
@@ -151,7 +160,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           </div>
         </div>
 
-        <MilestoneAxis document={history.current?.document ?? null} inProgress={project.status === "IN_PROGRESS"} />
+        <MilestoneAxis document={history.current?.document ?? null} inProgress={workspaceAvailable} />
 
         <nav className="mt-10 flex items-center gap-6 overflow-x-auto border-b border-border" aria-label="项目详情标签">
           {tabItems.map((item) => {
@@ -168,7 +177,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             <OverviewPanel
               project={{ id: project.id, title: project.title, originalRequirement: project.originalRequirement, version: project.version }}
               requesterName={actor.displayName}
-              builderLabel={project.status === "IN_PROGRESS" ? "已开工" : project.status === "AWAITING_BUILDER" ? "已选定，等待 Mock 押金" : "尚未承接"}
+              builderLabel={workspaceAvailable ? "已开工" : project.status === "AWAITING_BUILDER" ? "已选定，等待 Mock 押金" : "尚未承接"}
               stageLabel={stageLabel}
               locked={locked}
               budget={budget}
@@ -185,7 +194,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
               currentVersionId={history.current?.id ?? null}
             />
           ) : (
-            <MilestonesTab document={history.current?.document ?? null} inProgress={project.status === "IN_PROGRESS"} />
+            <MilestonesTab document={history.current?.document ?? null} inProgress={workspaceAvailable} />
           )}
         </div>
       </main>

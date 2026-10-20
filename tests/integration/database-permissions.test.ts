@@ -43,6 +43,8 @@ const businessTables = [
   "payments",
   "projects",
   "spec_versions",
+  "submission_reviews",
+  "submissions",
   "user_roles",
   "users",
 ];
@@ -138,6 +140,10 @@ describe("application database boundary", () => {
     ["move an interview session", "update app.aipm_sessions set project_id = gen_random_uuid()"],
     ["rewrite a spec version", "update app.spec_versions set content = '{}'::jsonb"],
     ["delete spec versions", "delete from app.spec_versions"],
+    ["rewrite a submission", "update app.submissions set summary = '改写历史'"],
+    ["delete submissions", "delete from app.submissions"],
+    ["rewrite a submission review", "update app.submission_reviews set reason = '改写历史'"],
+    ["delete submission reviews", "delete from app.submission_reviews"],
     ["delete payments", "delete from app.payments"],
     ["rewrite a milestone snapshot", "update app.milestones set title = '改写快照'"],
     ["delete milestones", "delete from app.milestones"],
@@ -194,6 +200,14 @@ describe("application database boundary", () => {
       "insert an application with a chosen timestamp",
       "insert into app.applications (id, project_id, builder_id, statement, spec_version_id, created_at) values (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), '申请', gen_random_uuid(), now())",
     ],
+    [
+      "insert a submission with a chosen timestamp",
+      "insert into app.submissions (id, project_id, milestone_id, builder_id, sequence, submission_key, summary, links, created_at) values (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 1, gen_random_uuid(), '提交', '[\"https://example.com\"]'::jsonb, now())",
+    ],
+    [
+      "insert a review with a chosen timestamp",
+      "insert into app.submission_reviews (id, project_id, milestone_id, submission_id, reviewer_id, outcome, criteria_results, reason, created_at) values (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'PASS', '[{\"position\":1,\"outcome\":\"PASS\"}]'::jsonb, null, now())",
+    ],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
   });
@@ -219,6 +233,11 @@ describe("application database boundary", () => {
         can_insert_payment_application: boolean;
         can_insert_milestone_snapshot: boolean;
         can_update_milestone_snapshot: boolean;
+        can_update_submission_history: boolean;
+        can_delete_submission_history: boolean;
+        can_insert_submission_timestamp: boolean;
+        can_insert_review_timestamp: boolean;
+        can_update_completion_timestamp: boolean;
       }[]
     >`
       select
@@ -239,7 +258,12 @@ describe("application database boundary", () => {
         has_column_privilege('qianzo_runtime', 'app.projects', 'started_at', 'UPDATE') as can_update_project_started_at,
         has_column_privilege('qianzo_runtime', 'app.payments', 'application_id', 'INSERT') as can_insert_payment_application,
         has_column_privilege('qianzo_runtime', 'app.milestones', 'title', 'INSERT') as can_insert_milestone_snapshot,
-        has_column_privilege('qianzo_runtime', 'app.milestones', 'title', 'UPDATE') as can_update_milestone_snapshot
+        has_column_privilege('qianzo_runtime', 'app.milestones', 'title', 'UPDATE') as can_update_milestone_snapshot,
+        has_column_privilege('qianzo_runtime', 'app.submissions', 'summary', 'UPDATE') as can_update_submission_history,
+        has_table_privilege('qianzo_runtime', 'app.submission_reviews', 'DELETE') as can_delete_submission_history,
+        has_column_privilege('qianzo_runtime', 'app.submissions', 'created_at', 'INSERT') as can_insert_submission_timestamp,
+        has_column_privilege('qianzo_runtime', 'app.submission_reviews', 'created_at', 'INSERT') as can_insert_review_timestamp,
+        has_column_privilege('qianzo_runtime', 'app.projects', 'completed_at', 'UPDATE') as can_update_completion_timestamp
     `;
 
     expect(privileges).toEqual({
@@ -262,6 +286,11 @@ describe("application database boundary", () => {
       can_insert_payment_application: true,
       can_insert_milestone_snapshot: true,
       can_update_milestone_snapshot: false,
+      can_update_submission_history: false,
+      can_delete_submission_history: false,
+      can_insert_submission_timestamp: false,
+      can_insert_review_timestamp: false,
+      can_update_completion_timestamp: true,
     });
   });
 

@@ -5,7 +5,7 @@
 1. [工程总纲 V0.2](docs/QIANZO_MVP_V0_ENGINEERING_BLUEPRINT.md)
 2. [开发与 Git 工作流程](docs/DEVELOPMENT_WORKFLOW.md)
 3. [S0～S3 施工切片](docs/BUILD_SLICES.md)
-4. 当前 Slice README；[S2：申请与企业选择](docs/slices/S2-applications-workspace/README.md)（S2-01/S2-02 已完成本地验收）；已完成基线见 [S1：需求变成可招募项目](docs/slices/S1-spec-publish/README.md) 与 [S0](docs/slices/S0-project-draft/README.md)
+4. 当前 Slice README；[S3：成果提交、逐条验收与项目完成](docs/slices/S3-delivery-acceptance/README.md)（本地实现、完整验证与主模型审查均已通过；尚未推送）；S2 基线见 [S2：申请与企业选择](docs/slices/S2-applications-workspace/README.md)，已完成基线见 [S1：需求变成可招募项目](docs/slices/S1-spec-publish/README.md) 与 [S0](docs/slices/S0-project-draft/README.md)
 5. 当前任务及已存在的项目状态、相关代码和测试；当前状态见 [PROJECT_STATUS](docs/PROJECT_STATUS.md)
 
 远端仓库：`https://github.com/xuyuufan/QianZo.git`。

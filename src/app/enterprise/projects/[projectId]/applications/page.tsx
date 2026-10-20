@@ -50,9 +50,11 @@ export default async function ProjectApplicationsPage({ params }: ApplicationsPa
         {result.projectStatus === "AWAITING_BUILDER" ? (
           <p className="mt-6 border border-requester/30 bg-card px-4 py-3 font-zh text-sm" role="status">已选择 Builder，等待其完成 Mock 押金。当前不提供押金或开工操作。</p>
         ) : null}
-        {result.projectStatus === "IN_PROGRESS" ? (
+        {result.projectStatus === "IN_PROGRESS" || result.projectStatus === "FINAL_REVIEW" || result.projectStatus === "COMPLETED" ? (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border border-requester/30 bg-card px-4 py-3">
-            <p className="font-zh text-sm" role="status">Builder 已完成 Mock 押金，项目已开工。</p>
+            <p className="font-zh text-sm" role="status">
+              {result.projectStatus === "COMPLETED" ? "项目已完成，交付历史仍可查看。" : result.projectStatus === "FINAL_REVIEW" ? "全部里程碑已通过，项目等待最终确认。" : "Builder 已完成 Mock 押金，项目已开工。"}
+            </p>
             <Link
               href={`/projects/${result.projectId}/workspace`}
               className="font-zh text-xs text-foreground underline decoration-border underline-offset-4 hover:text-requester"
@@ -69,8 +71,8 @@ export default async function ProjectApplicationsPage({ params }: ApplicationsPa
             {result.applications.map((application) => {
               const selected = result.selectedApplicationId === application.id;
               const statusLabel = selected
-                ? application.status === "ENGAGED" || result.projectStatus === "IN_PROGRESS"
-                  ? "已开工"
+                ? application.status === "ENGAGED" || result.projectStatus === "IN_PROGRESS" || result.projectStatus === "FINAL_REVIEW" || result.projectStatus === "COMPLETED"
+                  ? result.projectStatus === "COMPLETED" ? "项目已完成" : result.projectStatus === "FINAL_REVIEW" ? "最终验收中" : "已开工"
                   : "已选择 · 等待 Builder Mock 押金"
                 : application.status === "SUBMITTED"
                   ? "已提交"

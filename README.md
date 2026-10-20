@@ -1,6 +1,6 @@
 # Qianzo
 
-Qianzo 已完成 S0、S1 与 S2-01 的实现、本地验收和主模型审核；S2-02 Builder Mock 押金、项目开工与 Workspace 已实现、本地验收并通过主模型审核。已发布招募快照只对公开项目提供，申请和开工操作经真实 Supabase Auth、服务端业务规则和 PostgreSQL 约束处理。切片范围见 [S1 施工规格](docs/slices/S1-spec-publish/README.md) 与 [S2 当前施工计划](docs/slices/S2-applications-workspace/README.md)，状态和验证证据见 [PROJECT_STATUS](docs/PROJECT_STATUS.md)。
+Qianzo 的 S0、S1、S2-01 与 S2-02 已实现、本地验收并通过主模型审核；S3 交付闭环、完整本地验证与主模型审查均已通过，当前修改尚未推送。当前状态和验证收据见 [PROJECT_STATUS](docs/PROJECT_STATUS.md) 与 [S3 施工规格](docs/slices/S3-delivery-acceptance/README.md)。切片范围见 [S1 施工规格](docs/slices/S1-spec-publish/README.md)、[S2 施工规格](docs/slices/S2-applications-workspace/README.md) 与 [S3 施工规格](docs/slices/S3-delivery-acceptance/README.md)。
 
 ## 本机要求
 
@@ -85,11 +85,15 @@ Select-String DEMO_USER_PASSWORD D:\Qianzo\.env.tools.local
 10. 在结构化脱敏编辑器里替换需要保密的文字，检查预览和全部验收标准及验证方法，勾选「我已确认这是最终预览」后发布。（ID、条目数量与顺序、引用和工期不可编辑；文字变化后须重新确认）
 11. 用 Builder 登录并打开「招募浏览」。（能看到已发布项目、脱敏后的完整 Spec、参考预算与周期；看不到企业的原始需求、访谈对话、账号或付款明细）
 
-第 3、4、5 步验证隔离与并发，第 6～11 步验证 S1 链路：锁定不可改写、定金只生效一次、发布原子且不可回滚、招募视图只暴露脱敏快照。第 12～14 步验证 S2 申请、选择、Builder Mock 押金与 Workspace；服务端和数据库共同执行授权与状态转换，不依赖前端隐藏按钮。
+第 3、4、5 步验证隔离与并发，第 6～11 步验证 S1 链路：锁定不可改写、定金只生效一次、发布原子且不可回滚、招募视图只暴露脱敏快照。第 12～18 步验证 S2 申请、选择、Builder Mock 押金、S3 逐条验收与完成；服务端和数据库共同执行授权与状态转换，不依赖前端隐藏按钮。
 
 12. Builder 在公开项目详情提交申请；企业从项目的「查看申请」入口选择该 Builder。（项目变为等待 Builder 模拟押金，企业不能代替 Builder 操作押金。）
 13. Builder 打开 `/builder/applications`，创建并模拟固定本地 ¥1.00 押金成功。（不发生真实收付，也不代表合同接受；成功后项目进入进行中。）
-14. 企业与已选 Builder 从项目入口进入 `/projects/<projectId>/workspace`，检查公开标题、计划截止日、交付物、验收标准和验证方法；其他企业和 Builder 访问同一地址应看到 404。（当前没有成果提交、审核或验收按钮。）
+14. 企业与已选 Builder 从项目入口进入 `/projects/<projectId>/workspace`，检查公开标题、计划截止日、交付物、验收标准、验证方法和双方各自的导航；其他企业和 Builder 访问同一地址应看到 404。工作台会保留每次提交和验收历史，显示内容不包含私有需求、AIPM 对话或内部 Spec ID。
+15. 当前承接的 Builder 在正在进行的里程碑提交交付说明和 HTTP/HTTPS 链接；随后企业 owner 在 Workspace 按锁定标准逐项选择 PASS/FAIL。（平台只保存链接，不会访问地址或抓取内容；存在 FAIL 时必须填写返工原因。）
+16. Builder 重新进入 Workspace 查看返工记录，修改交付后提交新版本；企业再验收。（历史提交和失败记录保留；相同提交重放不会重复创建，不同内容不能复用同一个提交键。）
+17. 所有里程碑必须按顺序全部通过，项目才进入「最终验收」。（仅仍为 ACTIVE 的项目 owner 且具备 ENTERPRISE 角色的人可以继续确认。）
+18. 项目 owner 明确确认最终验收后，项目进入「已完成」；企业和已选 Builder 仍可查看完整交付与验收历史。（完成后不再接受新提交或审核；Mock 押金不代表真实收付或合同接受。）
 
 ## 验证
 
@@ -138,9 +142,9 @@ corepack pnpm demo:seed
 - 资源隔离由每个服务端入口执行；当前没有用户级 RLS，且不会宣称已有该隔离层。
 - S2-01 将项目推进到 `AWAITING_BUILDER`；S2-02 已贯通 Builder Mock 押金、开工、Milestone 初始化与共享 Workspace。本地完整 E2E 已通过；Mock 不代表真实资金结算或合同接受。
 - S1 不提供解锁、下架、重新发布或修改已公开内容；已发布快照、锁定范围与 Spec 历史均不可改写。
-- 尚未实现真实 AIPM、真实支付、文件上传、通知、管理员界面或生产部署；本地 Workspace 仅显示锁定公开范围派生的计划信息。
+- 尚未实现真实 AIPM、真实支付、文件上传、通知、管理员界面或生产部署；提交只保存说明和外部链接，不会抓取链接、上传文件或调用 AI。
 - 演示账号与本地数据库只用于合成开发数据，不代表企业认证、合同接受或真实交易；模拟定金不代表真实收付。
-- S2-02 已通过主模型审核；S3 成果提交与验收不属于本 Slice。
+- S2-02 已通过主模型审核；S3 已实现提交、逐条验收、返工历史、自动进入最终验收与企业最终确认，完整本地验证和主模型审查均已通过，尚未推送，当前记录见 [PROJECT_STATUS](docs/PROJECT_STATUS.md)。
 
 ## 权威文档
 
@@ -150,4 +154,5 @@ corepack pnpm demo:seed
 - [S0 施工规格](docs/slices/S0-project-draft/README.md)
 - [S1 施工规划：需求变成可招募项目](docs/slices/S1-spec-publish/README.md)
 - [S2 当前施工计划：申请与 Workspace](docs/slices/S2-applications-workspace/README.md)
+- [S3 当前施工规格：成果提交与验收](docs/slices/S3-delivery-acceptance/README.md)
 - [当前项目状态](docs/PROJECT_STATUS.md)

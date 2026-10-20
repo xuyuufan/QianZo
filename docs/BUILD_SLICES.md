@@ -6,7 +6,7 @@
 
 可以依据 V0.2 开始本地合成数据演示。无需重新设计架构，但开工前应把 Immediate Build Queue 分成下面四个可验收增量；每个增量都贯通页面、服务端业务规则与数据库。不要先把所有基础设施建完再做业务。
 
-本文是施工组织说明，不变更 Blueprint 的产品范围。S0、S1、S2-01 与 S2-02 均已完成实现、本地验收和主模型审核。详细范围见 [S2 README](slices/S2-applications-workspace/README.md)；实际状态、验证证据与提交记录见 [PROJECT_STATUS](PROJECT_STATUS.md)。
+本文是施工组织说明，不变更 Blueprint 的产品范围。S0、S1、S2-01 与 S2-02 均已完成实现、本地验收和主模型审核；S3 本地实现、完整验证与主模型审查均已通过，尚未推送。S3 详细范围见 [S3 README](slices/S3-delivery-acceptance/README.md)；S2 规格见 [S2 README](slices/S2-applications-workspace/README.md)；实际状态、验证证据与提交记录见 [PROJECT_STATUS](PROJECT_STATUS.md)。
 
 ## S0：真实登录与自己的项目
 
@@ -47,7 +47,7 @@ S0 开始时执行以下小任务：
 
 ## S3：成果变成已完成项目
 
-**对应 IBQ-09～10；等级：V0 REQUIRED。**
+**对应 IBQ-09～10；等级：V0 REQUIRED；状态：本地实现、完整验证与主模型审查均已通过，尚未推送；验收证据见 [S3 README](slices/S3-delivery-acceptance/README.md)。**
 
 - **目标：** Builder 提交成果链接，企业验收，通过后完成项目。
 - **范围：** Demo / Repo 链接提交、逐条验收、一次 FAIL → 新提交 → PASS、最终确认、完整 E2E 和交接说明。
@@ -56,7 +56,7 @@ S0 开始时执行以下小任务：
 
 ## 执行规则与范围
 
-- 每次只细拆当前获授权规划或实施的 Slice；S0、S1 与 S2-01 已完成，S2-02 见独立 README，S3 保持概要。
+- 每次只细拆当前获授权规划或实施的 Slice；S0～S2-02 已完成，S3 当前实施规格见独立 README。
 - 每个通过验收的小任务形成一个本地 commit；Slice 完成后按开发流程交付验证结果、提交记录和远端状态。
 - 权限检查、关键唯一约束和相应测试随业务功能实现，不留到最后补。
 - S0～S2 分别是可操作增量；四项完成后才构成第一条完整 Vertical Slice，不能把中间阶段称为完整交易闭环。

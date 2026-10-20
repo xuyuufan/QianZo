@@ -1,12 +1,14 @@
 # Qianzo 项目状态
 
-更新时间：2026-10-20（PR #4 角色导航及后续动作重放意见均已本地修复、定向验证并通过主模型复审）
+更新时间：2026-10-21（S3 本地完整验证与主模型审查 PASS；尚未推送；本节只记录已实际核验的进度）
 
-当前分支：`codex/s2-applications`，本轮复审基线 HEAD `3751841f4b7c7b1a582916826e727df67f6ac3af`，基于已同步的 `main` `185fd06d99a8de092963bd94b22dd38e5668a6bc`。PR #2/#3 已合并。S2-01 提交 `d1a3453` 与 S2-02 提交 `8e80bbf` 已发布为 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)，base 为 `main`，尚未合并。首轮自动评审在 `a8e960b` 上报告一条角色导航 P2，已本地修复；后续自动评审在 `3751841` 上报告发布重放 P2。主模型检查同类动作时另发现选人重放问题；两项本地修复均经定向验证及主模型复审 PASS。本次本地复审记录时修复尚未更新远端；自动评审结论仍对应修复前 `3751841`，不能据此声称修复后自动评审通过。
+当前工作分支：`codex/s3-delivery`，本轮从本地 `main` 基线 `8c037f3bd31746e556b10060c6ad84e639b6ced4` 开始。PR #2/#3 已合并；[PR #4](https://github.com/xuyuufan/QianZo/pull/4) 已由 GitHub 当前记录确认合并，`merged_at=2026-10-20T16:07:52Z`，merge commit 为 `8c037f3bd31746e556b10060c6ad84e639b6ced4`，与本地基线一致。S3 实现、完整本地门禁与主模型审查均已通过；当前修改仅在本地分支，尚未推送、开新 PR 或 merge。
 
-远端基线：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) merge commit `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) merge commit `185fd06d99a8de092963bd94b22dd38e5668a6bc`。合并后的 main tree 为 `a62f4dd3907513faead7a42039ecbce4a96aac36`，与 PR #3 最终修复 head `126848a` 的 tree 相同；本次复核 `git diff --exit-code 126848a origin/main` 返回 0。
+当前 Slice：S3「成果提交、逐条验收与项目完成」已实现并通过主模型审查。Migration 已应用至本地 Supabase；新增 append-only Submission/Review 历史、同项目同 Milestone 当前提交复合约束、逐项验收和失败返工、顺序推进、`FINAL_REVIEW` 与 owner 明确完成、授权 Workspace 历史和 S0→S3 合成项目 UI 主链。Workspace 的多表快照在只读 `REPEATABLE READ` 事务中读取；真实 PostgreSQL/Auth 屏障测试覆盖读取期间并发审核，防止合法状态被混读为 404。完整本地门禁通过；详细命令、退出码、数量和日志路径见 [S3 验收收据](slices/S3-delivery-acceptance/README.md)。本轮未运行 `db:reset`，未修改演示账号角色。
 
-当前 Slice：S2-01「Builder 申请与企业选择」与 S2-02「Builder Mock 押金、开工与 Workspace」均已实现、验收并通过主模型审核。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、Spec 可见性等 PPD 仍为 Pending。
+PR #2/#3 的提交与 tree 数据如下，属于 **PR #3 合并时（2026-10-15）的历史核验**，不是当前远端基线：当时 PR #2 merge commit 为 `6a9e5a9e0c79258953122022952e0c7538d3e985`，PR #3 merge commit 为 `185fd06d99a8de092963bd94b22dd38e5668a6bc`；当时合并后的 main tree `a62f4dd3907513faead7a42039ecbce4a96aac36` 与 PR #3 最终修复 head `126848a` 的 tree 相同，`git diff --exit-code 126848a origin/main` 返回 0。当前基线以本节首段的 PR #4 merge commit 为准。
+
+S0～S2-02 的既有验收记录保留在下文。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、Spec 可见性等 PPD 仍为 Pending。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
 
@@ -48,7 +50,7 @@ Builder 可在被选后的 `AWAITING_BUILDER` 状态创建并模拟成功固定�
 
 实现、本地验收与主模型审核已通过；提交 `d1a3453`、`8e80bbf` 已发布至 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)（base `main`），尚未合并；发布时尚无 GitHub 评审结论。平台与 AIPM 仍由同一项目团队端到端负责；Spec 可见性、报价、价格模式、选择后二次接受仍是 Pending Product Decisions。S3 成果提交、逐条验收与项目完成状态不属于本任务。
 
-## PR #2 / PR #3 基线衔接（2026-10-15）
+## PR #2 / PR #3 合并时的历史基线核验（2026-10-15）
 
 PR #2 的准确 head `736c42c0fe02f8b3a13ea71cb9eabce4d6e7ff49` 已合并；合并后的 `origin/main` 与该 head 的 tree 均为 `72c9c140a7863c7e3ebf01e357320d2fe810e066`，`git diff --exit-code 736c42c origin/main` 返回 0。PR #3 原 head `8989517` 的 tree 为 `9b6f8a075787c4a70ae0731e8275170118418d83`；新的祖先衔接提交 `42e692a` 以 `8989517` 为第一父提交、`6a9e5a9` 为第二父提交，tree 保持 `9b6f8a07...` 不变。该提交只补上 squash 后的祖先关系，没有丢弃 main 树上的差异。
 

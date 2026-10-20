@@ -44,12 +44,12 @@ export default async function EnterpriseProjectsPage({
   const counts: Record<ProjectFilter, number> = {
     all: projectList.length,
     draft: projectList.filter((project) => project.status === "DRAFT").length,
-    open: projectList.filter((project) => project.status === "OPEN" || project.status === "AWAITING_BUILDER" || project.status === "IN_PROGRESS").length,
+    open: projectList.filter((project) => project.status !== "DRAFT").length,
   };
   const visibleProjects = projectList.filter((project) =>
     selectedFilter === "all"
     || (selectedFilter === "draft" && project.status === "DRAFT")
-    || (selectedFilter === "open" && (project.status === "OPEN" || project.status === "AWAITING_BUILDER" || project.status === "IN_PROGRESS")),
+    || (selectedFilter === "open" && project.status !== "DRAFT"),
   );
 
   return (
@@ -106,8 +106,8 @@ export default async function EnterpriseProjectsPage({
               {visibleProjects.map((project) => {
                 const isOpen = project.status === "OPEN";
                 const isAwaitingBuilder = project.status === "AWAITING_BUILDER";
-                const isInProgress = project.status === "IN_PROGRESS";
-                const specHint = isOpen || isAwaitingBuilder || isInProgress
+                const hasStarted = project.status === "IN_PROGRESS" || project.status === "FINAL_REVIEW" || project.status === "COMPLETED";
+                const specHint = isOpen || isAwaitingBuilder || hasStarted
                   ? "Spec 已确认"
                   : project.currentSpecVersionId
                     ? "Spec 已有版本"
@@ -124,14 +124,14 @@ export default async function EnterpriseProjectsPage({
                           <span className="mt-1 block truncate font-zh text-xs text-muted-foreground">{project.originalRequirement}</span>
                         </span>
                         <span className="flex items-center gap-2 font-zh text-xs text-muted-foreground">
-                          <span className={`size-1.5 rounded-full ${isOpen || isAwaitingBuilder || isInProgress ? "bg-requester" : "bg-border"}`} />
-                          {isInProgress ? "进行中" : isAwaitingBuilder ? "等待 Builder Mock 押金" : isOpen ? "等待开发者" : "草稿"}
+                          <span className={`size-1.5 rounded-full ${isOpen || isAwaitingBuilder || hasStarted ? "bg-requester" : "bg-border"}`} />
+                          {project.status === "COMPLETED" ? "已完成" : project.status === "FINAL_REVIEW" ? "最终验收" : hasStarted ? "进行中" : isAwaitingBuilder ? "等待 Builder Mock 押金" : isOpen ? "等待开发者" : "草稿"}
                         </span>
                         <span className="hidden font-zh text-xs text-muted-foreground sm:block">{specHint}</span>
                         <span className="hidden text-right font-zh text-xs text-muted-foreground sm:block">{formatUpdatedAt(project.updatedAt)}</span>
                         <span className="hidden text-right text-sm text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground sm:block" aria-hidden="true">→</span>
                       </Link>
-                      {isInProgress ? (
+                      {hasStarted ? (
                         <Link
                           href={`/projects/${project.id}/workspace`}
                           className="px-3 py-2 font-zh text-xs text-foreground underline decoration-border underline-offset-4 hover:text-requester sm:justify-self-end"
