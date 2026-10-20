@@ -15,6 +15,7 @@ export function HomePage() {
   const [hoverRole, setHoverRole] = useState<Role | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [transitioning, setTransitioning] = useState<Role | null>(null);
+  const roleTransitionTimeout = useRef<number | null>(null);
   const activeRole = hoverRole ?? selectedRole;
 
   // The poster carries the first paint, so the 7.8MB clip is only requested
@@ -25,6 +26,14 @@ export function HomePage() {
   // server and client agree on) has no source yet.
   const [showVideo, setShowVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (roleTransitionTimeout.current !== null) {
+        window.clearTimeout(roleTransitionTimeout.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const query = window.matchMedia(
@@ -70,7 +79,8 @@ export function HomePage() {
     setSelectedRole(role);
     setTransitioning(role);
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.setTimeout(() => {
+    roleTransitionTimeout.current = window.setTimeout(() => {
+      roleTransitionTimeout.current = null;
       router.push(`/sign-in?intent=${role}`);
     }, reduceMotion ? 320 : 1300);
   };

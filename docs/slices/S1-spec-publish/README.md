@@ -122,7 +122,7 @@ Spec 版本分配在 Project 行锁内进行，最大版本号加一并以 UNIQU
 
 - 校验请求与响应 Schema、contractVersion、invocationId。GENERATE_SPEC 的 SUCCESS 必须带有效 SpecDocumentV1；INTERVIEW 可以只有回复。completeness 仅供审阅提示，不能触发采用、锁定或发布。
 - Mock 用稳定的合成 fixture 给出可重复访谈和候选。测试可以注入延迟、FAILED、缺少 Spec、错误关联 ID 或非法文档；不开放“跳过登录”的演示入口。
-- 输入长度、消息总量和响应体积设明确上限并测试，失败显示可理解提示；不靠静默截断丢掉需求或候选。
+- 输入长度、消息体积与单次请求 transcript 设明确上限并测试，失败显示可理解提示；不靠静默截断丢掉需求或候选。边界说明（2026-10-15）：`aipmLimits.messagesPerRequest` 限制单次 transcript 为 40 条。Mock 会话另用 40 条 admission cap；`begin` 只检查当前历史加上本轮 USER 与 ASSISTANT 后是否仍在阈值内（当前历史最多 38 条），不登记 in-flight reservation。Provider 失败只落 USER；并发下已接纳调用的合法回复仍保存，因此持久历史可能超过 40。从空历史按当前 begin/complete 语义推导最多 78 条（未实测）。该边界只描述本地 Mock；接入真实 Provider 前重新验证资源和并发限制。
 - 平台持有会话和消息，Mock 不自行写数据库。协议实现需要可共享的类型、校验器和示例；若后续另建 AIPM_CONTRACT 文档，应由总纲引用唯一完整定义，避免并列维护两份协议。
 
 ### 调用与过期候选

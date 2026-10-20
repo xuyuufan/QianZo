@@ -123,6 +123,22 @@ test("home role selection preserves keyboard access, transition and reduced moti
   expect(localVideoRequests.every((url) => new URL(url).origin === new URL(page.url()).origin)).toBe(true);
 });
 
+test("home cancels a delayed role navigation when browser back leaves the page", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/sign-in?intent=requester");
+  await page.getByRole("link", { name: /返回首页重新选择/ }).click();
+  await expect(page).toHaveURL(/\/$/);
+
+  await page.getByRole("button", { name: /我是开发者/ }).click();
+  await expect(page.locator(".qz-transition")).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/sign-in\?intent=requester$/);
+  await page.waitForTimeout(1450);
+
+  await expect(page).toHaveURL(/\/sign-in\?intent=requester$/);
+  await expect(page.getByLabel("邮箱")).toBeVisible();
+});
+
 test("sign-in intent and original narrow card keep the real auth form", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });

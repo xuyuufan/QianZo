@@ -1,18 +1,42 @@
 # Qianzo 项目状态
 
-更新时间：2026-10-15（现有 PR 基线收尾；FIX-BASELINE 主模型审核 PASS，本地提交未推送）
+更新时间：2026-10-20（PR #2 已合并；PR #3 新复审修复与最终验证通过，主模型审查 PASS）
 
-当前分支：`codex/s1-review-closeout`，以 `feat/lovable-ui-parity` 的 `1d54e02` 为基线；本轮修复已本地提交，尚未推送。
+当前分支：`codex/s1-review-closeout`，PR #3 已审核衔接基线 `42e692a84d5e517d2e500c823ac0d4a713ed2005` 的 tree 与 UI HEAD `8989517` 相同，并已同步到 `feat/lovable-ui-parity`。本次延迟角色导航修复、E2E 回归与文档更新已通过主审和最终验证；接下来按已授权流程更新现有 PR #3 并合并。
 
-远端状态：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) 与依赖它的 [PR #3](https://github.com/xuyuufan/QianZo/pull/3) 仍为 OPEN；本分支未推送，不能视为远端评审线程已解决。PR #3 有 3 条新未解决意见；PR #2 的 10 条未解决线程中，当前源码抽查的对应修复已存在，本记录不将其当成新缺陷，也不声称远端已 resolved。
+远端状态（本次本地提交前）：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) 已于 2026-10-15 squash 合并，merge commit 为 `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) 为 OPEN，base=`main`，远端 head=`42e692a84d5e517d2e500c823ac0d4a713ed2005`。主模型于 2026-10-20 发现第 4 条未解决 UI 评审意见；本地修复、最终验证和主审均已通过，接下来按已授权流程更新现有 PR 并合并。
 
-当前 Slice：S1「需求变成可招募项目」已完成本地实现与验证；FIX-BASELINE 修复已通过主模型审核并本地提交。S2 尚未开始，待更新既有 PR、获得用户合并授权并复验合并基线后，从 `main` 开始。
+当前 Slice：S1「需求变成可招募项目」已完成并合入 `main`；PR #3 的 UI 基线修复已通过本地主审与验证，等待按授权流程合并。S2 尚未开始；待 PR #3 合并、在最新 `main` 复验后再开始 S2。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、可见性等 PPD 仍为 Pending。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
 
-## FIX-BASELINE 评审修复（2026-10-15）
+## PR #2 / PR #3 基线衔接（2026-10-15）
 
-PR #3 的新意见仍保持远端未解决状态；以下本地修复与生产回归已通过主模型审核并提交：
+PR #2 的准确 head `736c42c0fe02f8b3a13ea71cb9eabce4d6e7ff49` 已合并；合并后的 `origin/main` 与该 head 的 tree 均为 `72c9c140a7863c7e3ebf01e357320d2fe810e066`，`git diff --exit-code 736c42c origin/main` 返回 0。PR #3 原 head `8989517` 的 tree 为 `9b6f8a075787c4a70ae0731e8275170118418d83`；新的祖先衔接提交 `42e692a` 以 `8989517` 为第一父提交、`6a9e5a9` 为第二父提交，tree 保持 `9b6f8a07...` 不变。该提交只补上 squash 后的祖先关系，没有丢弃 main 树上的差异。
+
+PR #3 已更新为 base `main`。在 2026-10-15 衔接提交 `42e692a` 时，base→head diff 为 68 个文件（6,152 insertions / 1,194 deletions），包含 UI、UI 回归、静态素材与当时已审规范更新；没有 migration，也没有 AIPM/Spec/Payment repository 或 service 变更。AIPM 路径的 `contract.ts`、`gateway.ts` 只改注释以表达版本化模块契约和未来 Provider 边界；`src/app/actions/auth.ts` 仅传递经过白名单校验的 UI 导航意图。2026-10-20 新增修复与验收见下方同日复审记录。
+
+流程依据：[GitHub CLI `gh pr merge`](https://cli.github.com/manual/gh_pr_merge) 与 [GitHub 修改 Pull Request base 的文档](https://docs.github.com/en/pull-requests/how-tos/create-pull-requests/changing-the-base-branch-of-a-pull-request?apiVersion=2022-11-28)。树完全相同后使用普通 Git 祖先衔接；随后普通非 force push，并通过 `gh pr edit --base main` 更新现有 PR，不创建新 PR。
+
+PR #2 准确 head 的基线验证：typecheck、lint 通过；87 个 unit 与 115 个 integration 用例通过；production build 输出 11 个 routes；5/5 production E2E 通过。使用的是与 PR #2 package/lock 直接依赖版本一致的本地已安装二进制，没有重建全新 frozen install。原 E2E 的 3 个 Builder 失败来自本地 seeded `builder@qianzo.local` 实际为 ACTIVE 双角色；仅在测试窗口移除额外 ENTERPRISE 行后 5 例通过，并按备份精确恢复角色、状态及 `created_at`。初次失败、5/5通过记录和恢复备份保存在 ignored `artifacts/ui-parity/merge-verification-20261015/pr2/`；之后 PR #2 的 10 条已核验 review thread 均标记 resolved。
+
+截至 2026-10-15 的记录，本分支 PR #3 完整验证及新增回归见下文，当时尚未合并 PR #3。没有 `db:reset`。S2 仍未开始。
+
+## PR #3 复审补充（2026-10-20）
+
+第 4 条新评审意见指出：首页 `chooseRole` 通过 1,300ms（普通动效）或 320ms（减少动态效果）延迟调用 `router.push`，用户在等待中通过浏览器返回离开时，待执行的回调仍会改写其后续导航。新增 E2E 从登录页通过站内链接进入首页、选择开发者、按返回并等待超过 1,300ms；验收要求留在原登录意图。
+
+修复在首页保留一个 timeout handle，并在组件卸载清除未完成的定时器；原转场与延迟不变。修复前 production 回归失败，离开后被推到 `sign-in?intent=builder`；修复后 targeted production E2E 通过 1/1。记录在 ignored `artifacts/ui-parity/merge-verification-20261020/role-transition-back-pre-fix.log`、`role-transition-back-pre-fix-error-context.md` 与 `role-transition-back-post-fix.log`。
+
+本次复用候选：[React 官方 `useEffect` 清理示例源码](https://github.com/reactjs/react.dev/blob/main/src/content/learn/synchronizing-with-effects.md)展示了 effect cleanup 调用 `clearTimeout`；已采用这一标准模式，不引入外部包或定时器框架。本地 Next 16 指南 `node_modules/next/dist/docs/01-app/01-getting-started/04-linking-and-navigating.md` 及 `01-app/03-api-reference/04-functions/use-router.md` 确认 App Router Link 和 `router.back()` 使用客户端历史导航，因此回归覆盖组件卸载后的实际浏览器返回路径。
+
+最终修复后检查：typecheck、lint 通过；100/100 unit、115/115 integration、16/16 production E2E 通过。Playwright production webServer 执行了 `corepack pnpm build && corepack pnpm start`；full E2E 日志、退出码 0 及 `.last-run.json` 保存在 ignored `artifacts/ui-parity/merge-verification-20261020/full-production-e2e.log`、`full-production-e2e-exit.txt` 与 `full-production-e2e.last-run.json`。完整套件在 `builder@qianzo.local` 的 ACTIVE BUILDER/ENTERPRISE 双角色下运行，测试前后角色状态和原始时间戳均核验一致，具体行值只保存在 ignored 的 `pre-run-builder-role-verification.txt` 与 `post-run-builder-role-verification.txt`。此前 2026-10-15 的 `.last-run.json` 只保存 `passed`/空 `failedTests`，无可核对的最终计数或进程退出记录，已标为不完整证据；当前验收不以其计数。
+
+## FIX-BASELINE 首次通过记录（2026-10-15；当时尚未更新远端）
+
+以下记录保留了 FIX-BASELINE 首次审核通过、远端尚未更新时的状态与证据；当时“本轮没有 push/merge”描述的是这一阶段，不代表当前远端状态。
+
+PR #3 的新意见在该记录时仍保持远端未解决状态；以下本地修复与生产回归已通过主模型审核并提交：
 
 | 新评审意见 | 本地处理与证据 |
 |---|---|
@@ -30,7 +54,7 @@ PR #3 的新意见仍保持远端未解决状态；以下本地修复与生产�
 
 ## Codex 评审修复历史记录（2026-10-02，按当时状态）
 
-以下评审线程数量、分支和远端状态截至 2026-10-02；新的状态见上方 FIX-BASELINE 记录。
+以下评审线程数量、分支和远端状态截至 2026-10-02；新的状态见文首基线衔接记录。
 
 针对 `e68b0d9` 上新增的 3 条 P2，逐条复现后完成修复；代码与回归用例提交为 `68b5193`，已推送到 PR #3。
 
@@ -98,7 +122,7 @@ S1 实现完成后做过一轮独立代码质检（功能正确性、异常处�
 
 **缺陷修复**
 
-- **消息上限 off-by-one**：`beginAipmInvocationWithDatabase` 原判据 `history.length + 1 > 上限`、`completeAipmInvocationWithDatabase` 原判据 `max(sequence) + 1 > 上限` 口径不一致；`maxSessionMessages` 又直接复用了「单次请求消息数」的常量。因 provider 失败时只落一条 USER 消息（`invokeAipmWithDatabase` 不调用 complete），会话消息数会出现奇数，累积到 39 条时 `begin` 放行并写入第 40 条 USER 消息、`complete` 随即抛错，造成「用户消息已落库但助手回复必然失败」的半程写入，且此后每轮都被拒。现在为会话总量单独定义 `aipmLimits.sessionMessages`，并让 `begin` 为一整轮（USER + ASSISTANT）预留空间；代价是一次 provider 失败会让会话提前一轮触顶，这是有意取舍，已在代码注释说明。
+- **消息上限 off-by-one**（边界说明于 2026-10-15 补充）：`beginAipmInvocationWithDatabase` 原判据 `history.length + 1 > 上限`、`completeAipmInvocationWithDatabase` 原判据 `max(sequence) + 1 > 上限` 口径不一致；`maxSessionMessages` 又直接复用了「单次请求消息数」的常量。Provider 失败只落 USER，旧判据会在 odd history 下留下无法完成的半程写入。现在会话 admission 单独定义 `aipmLimits.sessionMessages = 40`，`begin` 只检查当前历史加上本轮 USER 与 ASSISTANT 后仍在阈值内（当前历史最多 38 条），不登记 in-flight reservation；失败只落 USER，可能提前耗尽可用轮次。40 是 admission cap，不是并发下持久历史的硬上限：已接纳的重叠调用回复仍持久化；从空历史按当前 begin/complete 语义推导最多 78 条（未实测）。单次 transcript schema 上限为 40；真实 Provider 接入前需重新验证并发和资源限制，详见 [S1 README](slices/S1-spec-publish/README.md)。
 - **E2E 运行方式未固化**：`playwright.config.ts` 的 `webServer.command` 原为 `pnpm dev`，与「E2E 对生产构建运行」的约定不符，全新环境无法复现，且 `next dev` 冷启动会现场编译 Server Action 造成首个用例假失败。现改为 `corepack pnpm build && corepack pnpm start`（`timeout` 300s、`reuseExistingServer: !CI` 保留），两份 README 同步。
 - **错误映射重复**：5 个 Server Action 各写一份「领域错误 → `*ActionState`」映射。抽出 `src/app/actions/error-mapping.ts` 统一处理跨域同构部分（认证、身份、输入校验）与 SQLSTATE 兜底（`23505`→`VERSION_CONFLICT`，`23514`/`23503`→`INVALID_INPUT`，仍不外泄 SQL 原文、供应商正文或堆栈），各 action 只保留领域特有映射与自身文案。归并后**未改变任何既有错误码或中文文案**（已逐行核对）。
 - **行锁与版本校验重复**：「`for update` 锁行 + `expectedVersion` 校验 + `version` 递增」在 5 处以上重复。抽出 `src/modules/projects/lock.ts` 的 `withProjectLock`，改造 9 处调用点并保持各自的判定顺序与错误码不变（如 `publish` 的「已 OPEN 重复意图」仍先于锁定指针校验），锁顺序仍为 Project → Payment。
@@ -109,7 +133,7 @@ S1 实现完成后做过一轮独立代码质检（功能正确性、异常处�
 
 **补齐的验收证据**（此前验收矩阵中无自动化对应用例）
 
-- 消息上限边界：奇数历史下整轮被拒且不产生半程写入；最后一轮要么完整成对落库要么整轮被拒。
+- 消息 admission 边界：奇数历史下整轮被拒且不产生半程写入；单次 begin 检查两条本轮消息能否放在当前阈值内。该测试验证单次准入边界，不宣称并发下持久历史硬封顶 40。
 - 并发发布：两个相同意图都返回同一结果且 `version` 恰好 +1；两份不同预览只有一方成功、另一方 `PUBLISH_CONFLICT`，落库快照恰为胜者。
 - 已成功的定金在项目 `OPEN` 后重复请求返回同一结果且不改 `succeeded_at`/`version`/`published_at`。
 - 并发创建定金只产生一单。
