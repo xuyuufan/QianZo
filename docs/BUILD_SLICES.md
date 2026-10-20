@@ -6,7 +6,7 @@
 
 可以依据 V0.2 开始本地合成数据演示。无需重新设计架构，但开工前应把 Immediate Build Queue 分成下面四个可验收增量；每个增量都贯通页面、服务端业务规则与数据库。不要先把所有基础设施建完再做业务。
 
-本文是施工组织说明，不变更 Blueprint 的产品范围。S0、S1 与 S2-01 均已完成实现、本地验收和主模型审核；S2 后续任务的详细范围见 [S2 README](slices/S2-applications-workspace/README.md)；实际状态、验证证据与提交记录见 [PROJECT_STATUS](PROJECT_STATUS.md)。
+本文是施工组织说明，不变更 Blueprint 的产品范围。S0、S1、S2-01 与 S2-02 均已完成实现、本地验收和主模型审核。详细范围见 [S2 README](slices/S2-applications-workspace/README.md)；实际状态、验证证据与提交记录见 [PROJECT_STATUS](PROJECT_STATUS.md)。
 
 ## S0：真实登录与自己的项目
 
@@ -38,10 +38,10 @@ S0 开始时执行以下小任务：
 
 ## S2：申请变成项目开工
 
-**对应 IBQ-07～08；等级：V0 REQUIRED；状态：S2-01 实现、本地验收与主模型审核已通过；S2-02 押金开工未开始。**
+**对应 IBQ-07～08；等级：V0 REQUIRED；状态：S2-01 与 S2-02 均已实现、本地验收并通过主模型审核。**
 
-- **目标：** Builder 申请，企业选择；后续由 Builder 模拟押金后进入 Workspace。
-- **范围：** S2-01 申请表单与列表及企业选择；S2-02 再实现 Builder Mock Payment、开工事务、Milestone 初始化和 Workspace 页面。
+- **目标：** Builder 申请，企业选择；被选 Builder 完成本地模拟押金后开工并进入 Workspace。
+- **范围：** S2-01 申请表单与列表及企业选择；S2-02 Builder Mock Payment、开工事务、Milestone 初始化和只读 Workspace 页面。
 - **验收：** 禁止自申请和重复申请；并发选择最多成功一人；重复模拟付款不重复创建 Milestone；仅项目企业和选中且已开工的 Builder 可以进入 Workspace。
 - **演示约定：** 本地合成项目暂不演示报价谈判和选择后二次接受；此约定不是正式交易规则。
 
@@ -56,7 +56,7 @@ S0 开始时执行以下小任务：
 
 ## 执行规则与范围
 
-- 每次只细拆当前获授权规划或实施的 Slice；S0 与 S1 已完成，S2-01 见独立 README，S2-02 与 S3 保持概要。
+- 每次只细拆当前获授权规划或实施的 Slice；S0、S1 与 S2-01 已完成，S2-02 见独立 README，S3 保持概要。
 - 每个通过验收的小任务形成一个本地 commit；Slice 完成后按开发流程交付验证结果、提交记录和远端状态。
 - 权限检查、关键唯一约束和相应测试随业务功能实现，不留到最后补。
 - S0～S2 分别是可操作增量；四项完成后才构成第一条完整 Vertical Slice，不能把中间阶段称为完整交易闭环。

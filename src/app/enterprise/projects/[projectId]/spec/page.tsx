@@ -91,11 +91,23 @@ export default async function ProjectSpecPage({ params, searchParams }: SpecPage
             </p>
           </div>
           <div className="grid shrink-0 grid-cols-3 gap-4 font-zh text-xs sm:gap-6 sm:text-right">
-            <span><b className="mb-1 block font-normal text-muted-foreground">项目</b>{project.status === "AWAITING_BUILDER" ? "等待 Builder Mock 押金" : project.status === "OPEN" ? "招募中" : "草稿"}</span>
+            <span><b className="mb-1 block font-normal text-muted-foreground">项目</b>{project.status === "IN_PROGRESS" ? "进行中" : project.status === "AWAITING_BUILDER" ? "等待 Builder Mock 押金" : project.status === "OPEN" ? "招募中" : "草稿"}</span>
             <span><b className="mb-1 block font-normal text-muted-foreground">Spec</b>{current ? `当前 Spec 版本 ${current.versionNo}` : "未保存"}</span>
             <span><b className="mb-1 block font-normal text-muted-foreground">范围</b>{locked ? "已锁定" : "编辑中"}</span>
           </div>
         </header>
+
+        {project.status === "IN_PROGRESS" ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border border-requester/30 bg-card px-4 py-3">
+            <p className="font-zh text-xs text-muted-foreground" role="status">项目已开工；锁定 Spec 与历史记录继续保留。</p>
+            <Link
+              href={`/projects/${project.id}/workspace`}
+              className="font-zh text-xs text-foreground underline decoration-border underline-offset-4 hover:text-requester"
+            >
+              进入 Workspace →
+            </Link>
+          </div>
+        ) : null}
 
         <div className="spec-workspace-grid mt-8">
           <aside className="spec-interview-column" aria-label="需求访谈">

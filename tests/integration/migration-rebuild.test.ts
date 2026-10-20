@@ -134,7 +134,7 @@ beforeAll(async () => {
   const migrationFiles = readdirSync(migrationsDirectory)
     .filter((name) => name.endsWith(".sql"))
     .sort();
-  expect(migrationFiles.length).toBeGreaterThanOrEqual(10);
+  expect(migrationFiles.length).toBeGreaterThanOrEqual(11);
 
   for (const file of migrationFiles) {
     await scratch.unsafe(readFileSync(resolve(migrationsDirectory, file), "utf8"));
@@ -150,7 +150,7 @@ afterAll(async () => {
 });
 
 describeRebuild("migration chain rebuilt on an empty scratch database", () => {
-  it("creates exactly the eight business tables needed by implemented slices", async () => {
+  it("creates exactly the nine business tables needed by implemented slices", async () => {
     const tables = await scratch<{ table_name: string }[]>`
       select table_name
       from information_schema.tables
@@ -161,6 +161,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
       "aipm_messages",
       "aipm_sessions",
       "applications",
+      "milestones",
       "payments",
       "projects",
       "spec_versions",
@@ -169,7 +170,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
     ]);
   });
 
-  it("installs only the application, payment and project guard triggers", async () => {
+  it("installs only the application, milestone, payment and project guard triggers", async () => {
     const triggers = await scratch<{ trigger_name: string }[]>`
       select trigger_name
       from information_schema.triggers
@@ -178,6 +179,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
     `;
     expect(triggers.map((row) => row.trigger_name)).toEqual([
       "applications_guard_selected",
+      "milestones_guard_snapshot_immutable",
       "payments_guard_success",
       "projects_guard_locked_scope",
     ]);
@@ -239,6 +241,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
       "published_at",
       "published_spec_snapshot",
       "selected_application_id",
+      "started_at",
       "status",
       "title",
       "updated_at",
@@ -249,6 +252,7 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
 
     expect(await updateColumns("payments")).toEqual(["status", "succeeded_at", "updated_at"]);
     expect(await updateColumns("applications")).toEqual(["status", "updated_at"]);
+    expect(await updateColumns("milestones")).toEqual([]);
     const insertColumns = await scratch<{ column_name: string }[]>`
       select column_name
       from information_schema.column_privileges
@@ -301,11 +305,39 @@ describeRebuild("migration chain rebuilt on an empty scratch database", () => {
     ).map((row) => row.column_name);
     expect(paymentInsertColumns).toEqual([
       "amount_minor",
+      "application_id",
       "currency",
       "id",
       "payer_id",
       "project_id",
       "purpose",
+    ]);
+
+    const milestoneInsertColumns = (
+      await scratch<{ column_name: string }[]>`
+        select column_name
+        from information_schema.column_privileges
+        where grantee = 'qianzo_runtime'
+          and table_schema = 'app'
+          and table_name = 'milestones'
+          and privilege_type = 'INSERT'
+        order by column_name
+      `
+    ).map((row) => row.column_name);
+    expect(milestoneInsertColumns).toEqual([
+      "acceptance_criteria",
+      "deadline",
+      "deliverable_ids",
+      "deliverables",
+      "description",
+      "due_after_days",
+      "id",
+      "position",
+      "project_id",
+      "spec_milestone_id",
+      "spec_version_id",
+      "status",
+      "title",
     ]);
   });
 });

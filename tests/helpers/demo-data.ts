@@ -1,10 +1,10 @@
 import type postgres from "postgres";
 
 /**
- * Deletes the business rows the local demo and the tests create, in dependency
- * order: applications and payments depend on projects/specs/users, spec
- * versions point at projects and candidate messages, messages point at
- * sessions, and projects point back at spec versions and a selected application.
+ * Deletes the business rows the local demo and the tests create in dependency
+ * order: milestones depend on projects/spec versions, payments can reference an
+ * application, spec versions point at projects and candidate messages,
+ * messages point at sessions, and projects point back at specs/applications.
  *
  * Everything runs in one transaction because the project pointers are
  * deferrable: their checks run at commit, by which point both sides are gone.
@@ -20,13 +20,15 @@ export async function clearDemoBusinessData(
   }
 
   await sql.begin(async (transaction) => {
-    await transaction`
-      delete from app.applications
-      where project_id in (select id from app.projects where owner_id in ${transaction(userIds)})
-    `;
-    // Payments reference both the project and the payer, so they go first.
+    await transaction`delete from app.milestones
+      where project_id in (select id from app.projects where owner_id in ${transaction(userIds)})`;
+    // Payments reference both the project and, for Builder deposits, the application.
     await transaction`
       delete from app.payments
+      where project_id in (select id from app.projects where owner_id in ${transaction(userIds)})
+    `;
+    await transaction`
+      delete from app.applications
       where project_id in (select id from app.projects where owner_id in ${transaction(userIds)})
     `;
     await transaction`

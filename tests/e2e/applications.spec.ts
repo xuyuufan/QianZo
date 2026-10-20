@@ -97,6 +97,12 @@ test.beforeAll(async () => {
           version = 4
       where id = ${projectId}`;
   });
+  // The already-published application needs its enterprise deposit, but the
+  // Builder deposit and project start below must happen through the UI.
+  await adminSql`
+    insert into app.payments (id, project_id, payer_id, purpose, amount_minor, currency, status, succeeded_at)
+    values (${randomUUID()}, ${projectId}, ${userIds[0]}, 'ENTERPRISE_DEPOSIT', 100, 'CNY', 'SUCCEEDED', now())
+  `;
 });
 
 test.afterAll(async () => {
@@ -165,14 +171,56 @@ test("a Builder applies, the project owner selects them, and private application
     await expect(enterprisePage.getByText(statement)).toBeVisible();
     await enterprisePage.getByRole("button", { name: "选择 Builder" }).click();
     await expect(enterprisePage.getByRole("status")).toContainText("等待其完成 Mock 押金");
-    await expect(enterprisePage.getByTestId("application-status")).toHaveText("已选择");
+    await expect(enterprisePage.getByTestId("application-status")).toHaveText("已选择 · 等待 Builder Mock 押金");
 
     await page.reload();
     await expect(page.getByTestId("application-status")).toHaveText("已被选择 · 等待 Mock 押金");
+    await expect(page.getByRole("heading", { name: "Builder Mock 押金 · ¥1.00" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
       await page.evaluate(() => document.documentElement.clientWidth),
     );
-    await expect(page.getByRole("button", { name: /押金|开工/ })).toHaveCount(0);
+    await page.getByRole("button", { name: "创建 Builder 模拟押金" }).click();
+    await expect(page.getByTestId("builder-deposit-status")).toContainText("等待你完成模拟支付");
+    await page.getByRole("button", { name: "模拟押金支付成功" }).click();
+    await expect(page.getByTestId("application-status")).toHaveText("已开工");
+    await page.reload();
+    await expect(page.getByTestId("application-status")).toHaveText("已开工");
+    const builderWorkspaceLink = page.getByRole("link", { name: "进入 Workspace →" });
+    await expect(builderWorkspaceLink).toBeVisible();
+    await builderWorkspaceLink.click();
+    await expect(page.getByRole("heading", { name: "S2 公开申请项目" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "项目里程碑" })).toBeVisible();
+    await expect(page.getByText(/PRIVATE-S2 原始需求/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /提交成果|验收/ })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+      await page.evaluate(() => document.documentElement.clientWidth),
+    );
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "项目里程碑" })).toBeVisible();
+
+    await enterprisePage.goto(`/enterprise/projects/${projectId}/applications`);
+    await expect(enterprisePage.getByRole("status")).toContainText("项目已开工");
+    await enterprisePage.getByRole("link", { name: "进入 Workspace →" }).click();
+    await expect(enterprisePage.getByRole("heading", { name: "S2 公开申请项目" })).toBeVisible();
+    await enterprisePage.goto(`/enterprise/projects/${projectId}`);
+    await expect(enterprisePage.getByText("项目已开工", { exact: false }).first()).toBeVisible();
+    await expect(enterprisePage.getByRole("link", { name: "进入 Workspace" })).toBeVisible();
+    await enterprisePage.goto(`/enterprise/projects/${projectId}/publish`);
+    await expect(enterprisePage.getByText("状态 进行中")).toBeVisible();
+    await expect(enterprisePage.getByRole("link", { name: "进入 Workspace →" })).toBeVisible();
+    await enterprisePage.goto(`/enterprise/projects/${projectId}/spec`);
+    await expect(enterprisePage.getByText("项目进行中", { exact: true })).toBeVisible();
+    await expect(enterprisePage.getByRole("link", { name: "进入 Workspace →" })).toBeVisible();
+    await enterprisePage.goto("/enterprise/projects");
+    await expect(enterprisePage.getByText("进行中", { exact: true })).toBeVisible();
+    await expect(enterprisePage.getByRole("link", { name: "进入 Workspace →" })).toBeVisible();
+
+    const hiddenBuilderWorkspace = await otherBuilderPage.goto(`/projects/${projectId}/workspace`);
+    expect(hiddenBuilderWorkspace?.status()).toBe(404);
+    await expect(otherBuilderPage.getByText("S2 公开申请项目")).toHaveCount(0);
+    const hiddenEnterpriseWorkspace = await otherEnterprisePage.goto(`/projects/${projectId}/workspace`);
+    expect(hiddenEnterpriseWorkspace?.status()).toBe(404);
+    await expect(otherEnterprisePage.getByText("S2 公开申请项目")).toHaveCount(0);
   } finally {
     await Promise.all([
       otherBuilderPage.close(),

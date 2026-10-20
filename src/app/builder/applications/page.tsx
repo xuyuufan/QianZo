@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 
 import { getActorById } from "@/modules/identity/service";
 import { listOwnApplications } from "@/modules/applications/service";
+import { getBuilderDeposit } from "@/modules/payments/service";
 import { getVerifiedUserId } from "@/platform/auth/server";
 
 import { ProjectHeader, projectHeaderRoles } from "../../enterprise/projects/project-header";
+import { BuilderDepositForm } from "./builder-deposit-form";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,13 @@ export default async function BuilderApplicationsPage() {
   if (!actor.roles.includes("BUILDER")) redirect("/projects");
 
   const applications = await listOwnApplications(userId);
+  const applicationsWithDeposit = await Promise.all(applications.map(async (application) => ({
+    ...application,
+    deposit: application.applicationStatus === "SELECTED"
+      && application.projectStatus === "AWAITING_BUILDER"
+      ? await getBuilderDeposit(userId, application.projectId)
+      : null,
+  })));
 
   return (
     <div className="qz-paper min-h-[100svh]">
@@ -38,12 +47,13 @@ export default async function BuilderApplicationsPage() {
           <Link href="/projects" className="font-zh text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">返回项目大厅</Link>
         </header>
 
-        {applications.length === 0 ? (
+        {applicationsWithDeposit.length === 0 ? (
           <p className="py-16 text-center font-zh text-sm text-muted-foreground">还没有提交申请。</p>
         ) : (
           <ul className="mt-8 grid gap-4">
-            {applications.map((application) => {
+            {applicationsWithDeposit.map((application) => {
               const selected = application.applicationStatus === "SELECTED";
+              const engaged = application.applicationStatus === "ENGAGED";
               const status = application.applicationStatus === "SELECTED"
                 ? "已被选择 · 等待 Mock 押金"
                 : application.applicationStatus === "ENGAGED"
@@ -52,7 +62,9 @@ export default async function BuilderApplicationsPage() {
                     ? "未被选择"
                     : application.projectStatus === "AWAITING_BUILDER"
                       ? "申请仍在提交状态 · 项目已进入等待 Builder 阶段"
-                      : "等待企业选择";
+                      : application.projectStatus === "IN_PROGRESS"
+                        ? "项目已开工，当前申请未被选择"
+                        : "等待企业选择";
               return (
                 <li key={application.applicationId} className="rounded-md border border-border bg-card p-5 sm:p-6">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -60,14 +72,28 @@ export default async function BuilderApplicationsPage() {
                       <h2 className="font-zh text-lg font-normal">{application.title}</h2>
                       <p className="mt-2 font-zh text-xs text-muted-foreground">提交于 {dateFormat.format(application.appliedAt)}</p>
                     </div>
-                    <span className={`font-zh text-xs ${selected ? "text-builder" : "text-muted-foreground"}`} data-testid="application-status">
+                    <span className={`font-zh text-xs ${selected || engaged ? "text-builder" : "text-muted-foreground"}`} data-testid="application-status">
                       {status}
                     </span>
                   </div>
                   <p className="mt-4 whitespace-pre-wrap border-t border-border pt-4 font-zh text-sm leading-6 text-muted-foreground">{application.statement}</p>
                   <p className="mt-4 font-zh text-[11px] leading-5 text-muted-foreground">
-                    {selected ? "企业已选中你；Mock 押金和开工将在后续步骤处理。" : "本页只显示你的申请，不公开项目的私有需求或完整 Spec。"}
+                    {engaged
+                      ? "项目已开工；Workspace 只展示公开标题和锁定 Spec 派生的里程碑。"
+                      : selected
+                        ? "企业已选中你；完成固定 Builder 模拟押金后项目才会开工。"
+                        : "本页只显示你的申请，不公开项目的私有需求或完整 Spec。"}
                   </p>
+                  {engaged ? (
+                    <Link
+                      href={`/projects/${application.projectId}/workspace`}
+                      className="mt-4 inline-flex font-zh text-xs text-foreground underline decoration-border underline-offset-4 hover:text-builder"
+                    >
+                      进入 Workspace →
+                    </Link>
+                  ) : selected && application.projectStatus === "AWAITING_BUILDER" && application.deposit ? (
+                    <BuilderDepositForm deposit={application.deposit} />
+                  ) : null}
                 </li>
               );
             })}

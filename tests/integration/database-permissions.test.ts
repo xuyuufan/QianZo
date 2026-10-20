@@ -39,6 +39,7 @@ const businessTables = [
   "aipm_messages",
   "aipm_sessions",
   "applications",
+  "milestones",
   "payments",
   "projects",
   "spec_versions",
@@ -138,6 +139,8 @@ describe("application database boundary", () => {
     ["rewrite a spec version", "update app.spec_versions set content = '{}'::jsonb"],
     ["delete spec versions", "delete from app.spec_versions"],
     ["delete payments", "delete from app.payments"],
+    ["rewrite a milestone snapshot", "update app.milestones set title = '改写快照'"],
+    ["delete milestones", "delete from app.milestones"],
   ])("does not let runtime %s", async (_label, statement) => {
     await expect(runtime.unsafe(statement)).rejects.toMatchObject({ severity: "ERROR" });
   });
@@ -212,6 +215,10 @@ describe("application database boundary", () => {
         can_update_application_statement: boolean;
         can_insert_application_status: boolean;
         can_insert_application_builder: boolean;
+        can_update_project_started_at: boolean;
+        can_insert_payment_application: boolean;
+        can_insert_milestone_snapshot: boolean;
+        can_update_milestone_snapshot: boolean;
       }[]
     >`
       select
@@ -228,7 +235,11 @@ describe("application database boundary", () => {
         has_column_privilege('qianzo_runtime', 'app.applications', 'status', 'UPDATE') as can_update_application_status,
         has_column_privilege('qianzo_runtime', 'app.applications', 'statement', 'UPDATE') as can_update_application_statement,
         has_column_privilege('qianzo_runtime', 'app.applications', 'status', 'INSERT') as can_insert_application_status,
-        has_column_privilege('qianzo_runtime', 'app.applications', 'builder_id', 'INSERT') as can_insert_application_builder
+        has_column_privilege('qianzo_runtime', 'app.applications', 'builder_id', 'INSERT') as can_insert_application_builder,
+        has_column_privilege('qianzo_runtime', 'app.projects', 'started_at', 'UPDATE') as can_update_project_started_at,
+        has_column_privilege('qianzo_runtime', 'app.payments', 'application_id', 'INSERT') as can_insert_payment_application,
+        has_column_privilege('qianzo_runtime', 'app.milestones', 'title', 'INSERT') as can_insert_milestone_snapshot,
+        has_column_privilege('qianzo_runtime', 'app.milestones', 'title', 'UPDATE') as can_update_milestone_snapshot
     `;
 
     expect(privileges).toEqual({
@@ -247,6 +258,10 @@ describe("application database boundary", () => {
       can_update_application_statement: false,
       can_insert_application_status: false,
       can_insert_application_builder: true,
+      can_update_project_started_at: true,
+      can_insert_payment_application: true,
+      can_insert_milestone_snapshot: true,
+      can_update_milestone_snapshot: false,
     });
   });
 

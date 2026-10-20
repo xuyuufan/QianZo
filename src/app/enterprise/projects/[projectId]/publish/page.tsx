@@ -46,8 +46,9 @@ export default async function ProjectPublishPage({ params }: PublishPageProps) {
   const lockedVersion = specs.versions.find((version) => version.id === project.lockedSpecVersionId) ?? null;
 
   const locked = project.lockedSpecVersionId !== null;
-  const published = project.status === "OPEN" || project.status === "AWAITING_BUILDER";
+  const published = project.status === "OPEN" || project.status === "AWAITING_BUILDER" || project.status === "IN_PROGRESS";
   const awaitingBuilder = project.status === "AWAITING_BUILDER";
+  const inProgress = project.status === "IN_PROGRESS";
   const budget = describeBudget(project.budgetMinMinor, project.budgetMaxMinor, project.currency);
   const depositSucceeded = payment?.status === "SUCCEEDED";
 
@@ -73,7 +74,7 @@ export default async function ProjectPublishPage({ params }: PublishPageProps) {
             </p>
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2 font-zh text-xs text-muted-foreground">
-            <span>状态 {awaitingBuilder ? "等待 Builder Mock 押金" : published ? "招募中" : locked ? "范围已锁定" : "草稿"}</span>
+            <span>状态 {inProgress ? "进行中" : awaitingBuilder ? "等待 Builder Mock 押金" : published ? "招募中" : locked ? "范围已锁定" : "草稿"}</span>
             <span>参考预算 {budget ?? "未填写"}</span>
           </div>
         </header>
@@ -124,7 +125,7 @@ export default async function ProjectPublishPage({ params }: PublishPageProps) {
               </section>
             )}
 
-            {locked ? (
+            {locked && !inProgress ? (
               <section className="mt-8 border-t border-border pt-6">
                 <p className="font-brand text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Mock payment</p>
                 <h2 className="mt-2 font-zh text-lg font-normal">企业 Mock 定金</h2>
@@ -154,10 +155,10 @@ export default async function ProjectPublishPage({ params }: PublishPageProps) {
                 <p className="font-brand text-[10px] uppercase tracking-[0.16em] text-builder">Published</p>
                 <h2 className="mt-2 font-zh text-xl font-normal">已发布</h2>
                 <p className="mt-4 max-w-xl font-zh text-sm leading-6" role="status">
-                  {awaitingBuilder ? "企业已选定 Builder，项目等待 Mock 押金后开工。" : "项目状态为 OPEN"}，发布于 {project.publishedAt ? momentFormat.format(project.publishedAt) : "—"}。S1 不提供下架或修改已公开内容的动作。
+                  {inProgress ? "Builder 已完成本地模拟押金，项目已开工。" : awaitingBuilder ? "企业已选定 Builder，项目等待 Mock 押金后开工。" : "项目状态为 OPEN"}，发布于 {project.publishedAt ? momentFormat.format(project.publishedAt) : "—"}。S1 不提供下架或修改已公开内容的动作。
                 </p>
-                <Link className="mt-6 inline-flex border border-border px-4 py-2.5 font-zh text-xs transition-colors hover:border-foreground" href={awaitingBuilder ? `/enterprise/projects/${project.id}/applications` : `/projects/${project.id}`}>
-                  {awaitingBuilder ? "查看申请与已选 Builder →" : "查看招募视图（登录用户看到的内容）→"}
+                <Link className="mt-6 inline-flex border border-border px-4 py-2.5 font-zh text-xs transition-colors hover:border-foreground" href={inProgress ? `/projects/${project.id}/workspace` : awaitingBuilder ? `/enterprise/projects/${project.id}/applications` : `/projects/${project.id}`}>
+                  {inProgress ? "进入 Workspace →" : awaitingBuilder ? "查看申请与已选 Builder →" : "查看招募视图（登录用户看到的内容）→"}
                 </Link>
               </div>
             ) : !locked ? (

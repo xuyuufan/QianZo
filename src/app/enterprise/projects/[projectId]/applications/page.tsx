@@ -50,6 +50,17 @@ export default async function ProjectApplicationsPage({ params }: ApplicationsPa
         {result.projectStatus === "AWAITING_BUILDER" ? (
           <p className="mt-6 border border-requester/30 bg-card px-4 py-3 font-zh text-sm" role="status">已选择 Builder，等待其完成 Mock 押金。当前不提供押金或开工操作。</p>
         ) : null}
+        {result.projectStatus === "IN_PROGRESS" ? (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border border-requester/30 bg-card px-4 py-3">
+            <p className="font-zh text-sm" role="status">Builder 已完成 Mock 押金，项目已开工。</p>
+            <Link
+              href={`/projects/${result.projectId}/workspace`}
+              className="font-zh text-xs text-foreground underline decoration-border underline-offset-4 hover:text-requester"
+            >
+              进入 Workspace →
+            </Link>
+          </div>
+        ) : null}
 
         {result.applications.length === 0 ? (
           <p className="py-16 text-center font-zh text-sm text-muted-foreground">目前还没有申请。</p>
@@ -57,12 +68,23 @@ export default async function ProjectApplicationsPage({ params }: ApplicationsPa
           <ul className="mt-8 grid gap-4">
             {result.applications.map((application) => {
               const selected = result.selectedApplicationId === application.id;
+              const statusLabel = selected
+                ? application.status === "ENGAGED" || result.projectStatus === "IN_PROGRESS"
+                  ? "已开工"
+                  : "已选择 · 等待 Builder Mock 押金"
+                : application.status === "SUBMITTED"
+                  ? "已提交"
+                  : application.status === "REJECTED"
+                    ? "未被选择"
+                    : application.status === "ENGAGED"
+                      ? "已开工"
+                      : "状态更新中";
               return (
                 <li key={application.id} className="grid gap-5 rounded-md border border-border bg-card p-5 sm:grid-cols-[1fr_auto] sm:items-start sm:p-6">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
                       <h2 className="font-zh text-base font-normal">{application.displayName}</h2>
-                      <span className="font-zh text-xs text-muted-foreground" data-testid="application-status">{selected ? "已选择" : application.status === "SUBMITTED" ? "已提交" : application.status}</span>
+                      <span className="font-zh text-xs text-muted-foreground" data-testid="application-status">{statusLabel}</span>
                     </div>
                     <p className="mt-2 whitespace-pre-wrap font-zh text-sm leading-6 text-muted-foreground">{application.statement}</p>
                   </div>

@@ -1,18 +1,36 @@
 # Qianzo 项目状态
 
-更新时间：2026-10-20（S2-01 主模型审核 PASS，本地已提交）
+更新时间：2026-10-20（S2-02 实现、本地验收与主模型审核 PASS）
 
-当前分支：`codex/s2-applications`，从已同步的 `main` 基线 `185fd06d99a8de092963bd94b22dd38e5668a6bc` 创建。PR #2/#3 已合并；S2-01 已通过主模型审核并本地提交，尚未推送。
+当前分支：`codex/s2-applications`，从已同步的 `main` 基线 `185fd06d99a8de092963bd94b22dd38e5668a6bc` 创建。PR #2/#3 已合并；S2-01 已通过主模型审核并本地提交，尚未推送。S2-02 的前端、服务、迁移、E2E 与文档已在同一工作区完成并通过主模型审核；本地提交随本次变更创建，具体见 `git log`。
 
 远端基线：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) merge commit `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) merge commit `185fd06d99a8de092963bd94b22dd38e5668a6bc`。合并后的 main tree 为 `a62f4dd3907513faead7a42039ecbce4a96aac36`，与 PR #3 最终修复 head `126848a` 的 tree 相同；本次复核 `git diff --exit-code 126848a origin/main` 返回 0。
 
-当前 Slice：S2-01「Builder 申请与企业选择」实现、验收和主模型审核均已通过；S2-02 Builder Mock 押金、开工与 Workspace 尚未开始。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、Spec 可见性等 PPD 仍为 Pending。
+当前 Slice：S2-01「Builder 申请与企业选择」与 S2-02「Builder Mock 押金、开工与 Workspace」均已实现、验收并通过主模型审核。平台与 AIPM 由同一项目团队端到端负责，Provider 替换保持内部模块边界；报价、二次接受、Spec 可见性等 PPD 仍为 Pending。
 
 权威文档位置：根目录只保留 `README.md` 与 `AGENTS.md`；总纲、Workflow、施工切片、本文件与切片施工说明集中在 `docs/`。
 
 ## S2-01 当前实施（2026-10-20）
 
-已新增 S2 README、`applications` migration、服务端申请/选择与白名单 DTO、Builder「我的申请」和企业申请列表入口，并将 `db:prepare` 应用于本地数据库（未执行 `db:reset`）。`typecheck`、`lint`、12 个文件的 100/100 unit、串行 10 个文件的 122/122 integration，以及生产构建上的 17/17 E2E 均通过。构建生成 12 个产品路由（Next app-paths manifest 共 14 项，另含 2 个内部错误路由）。完整 E2E 日志与退出码保存在忽略目录 `artifacts/ui-parity/s2/verification-20261020/`。S2-01 已通过主模型审核并完成本地提交；S2-02 尚未开始。
+已新增 S2 README、`applications` migration、服务端申请/选择与白名单 DTO、Builder「我的申请」和企业申请列表入口，并将 `db:prepare` 应用于本地数据库（未执行 `db:reset`）。`typecheck`、`lint`、12 个文件的 100/100 unit、串行 10 个文件的 122/122 integration，以及生产构建上的 17/17 E2E 均通过。构建生成 12 个产品路由（Next app-paths manifest 共 14 项，另含 2 个内部错误路由）。完整 E2E 日志与退出码保存在忽略目录 `artifacts/ui-parity/s2/verification-20261020/`。S2-01 已通过主模型审核并完成本地提交；其验收结果不代表 S2-02 已通过。
+
+## S2-02 实现与验收（2026-10-20；主模型审核 PASS）
+
+Builder 可在被选后的 `AWAITING_BUILDER` 状态创建并模拟成功固定本地 ¥1.00 Mock 押金；成功后服务端事务将项目推进到 `IN_PROGRESS`、选中申请推进到 `ENGAGED`，并将其他仍为 `SUBMITTED` 的申请推进到 `REJECTED`。Milestone 从锁定公开 Spec 初始化，首个为 `IN_PROGRESS`，其余为 `PENDING`；截止时间以共同的 `started_at` UTC epoch 加累计 `dueAfterDays × 86400` 秒计算。共享 `/projects/[projectId]/workspace` 只向项目企业和当前已开工的选中 Builder 返回公开标题、开始时间、里程碑、截止日、交付物及验收标准/验证方法；其他参与者收到 404，不返回原始需求、AIPM 私有对话、私有 Spec 或付款明细。Workspace 本轮不包含 S3 的成果提交、审核或最终验收能力；Mock 付款不代表真实收付或合同接受。
+
+完整 production E2E 从申请和企业选择开始，由 Builder 实际创建并模拟成功押金，再验证双方 Workspace、非参与者 404、刷新后的状态与 390px 布局。测试起始夹具只为已发布项目准备企业成功定金，不预置 Builder 付款、`ENGAGED`、`IN_PROGRESS` 或 Milestone。
+
+本轮实际验证：
+
+- `corepack pnpm typecheck`、`corepack pnpm lint`：通过；两项在 E2E 后以非 CI 环境运行，未触发依赖重建。
+- `corepack pnpm test`：100/100 unit 通过。
+- 串行 PostgreSQL/Auth integration：11 个文件，127/127 通过。Builder 开工 targeted integration 最终 3/3 通过；首次 2/3 是 Drizzle error `cause` 断言层级不匹配，修正后通过。
+- `db:prepare`：exit 0，待应用 migration 列表为空；未执行 `db:reset`。
+- `CI=1 corepack pnpm test:e2e`：fresh production build/start 上 17/17 通过，exit 0（约 1.7 分钟）。Next app paths manifest 共 15 项：13 个产品路由、2 个内部错误路由（`/_global-error/page`、`/_not-found/page`）。
+
+最终 E2E 命令输出、exit、Playwright 状态和产品/内部路由计数保存在忽略目录 `artifacts/ui-parity/s2-02/verification-20261020/full-production-e2e.log`、`full-production-e2e-exit.txt`、`full-production-e2e.last-run.json` 和 `production-route-count.txt`。前两次完整运行因断言仍使用旧阶段/页面文案而失败，修正文本匹配后最终 17/17 通过；两份失败日志与上下文保存在 `failed-first/` 和 `failed-second/`，作为保留的负结果。首次 CI 环境运行触发 pnpm `Recreating node_modules`，随后 `corepack pnpm install --frozen-lockfile --force` 恢复成功且未改 lockfile；安装输出和首次重建记录保存在同目录。仓库已在 `pnpm-workspace.yaml` 显式设置 `enableGlobalVirtualStore: false`，背景与引用见根 README 的 pnpm 运行说明。
+
+实现、本地验收与主模型审核已通过；本地提交随本次变更创建，具体见 `git log`。平台与 AIPM 仍由同一项目团队端到端负责；Spec 可见性、报价、价格模式、选择后二次接受仍是 Pending Product Decisions。S3 成果提交、逐条验收与项目完成状态不属于本任务。
 
 ## PR #2 / PR #3 基线衔接（2026-10-15）
 
@@ -24,7 +42,7 @@ PR #3 已更新为 base `main`。在 2026-10-15 衔接提交 `42e692a` 时，bas
 
 PR #2 准确 head 的基线验证：typecheck、lint 通过；87 个 unit 与 115 个 integration 用例通过；production build 输出 11 个 routes；5/5 production E2E 通过。使用的是与 PR #2 package/lock 直接依赖版本一致的本地已安装二进制，没有重建全新 frozen install。原 E2E 的 3 个 Builder 失败来自本地 seeded `builder@qianzo.local` 实际为 ACTIVE 双角色；仅在测试窗口移除额外 ENTERPRISE 行后 5 例通过，并按备份精确恢复角色、状态及 `created_at`。初次失败、5/5通过记录和恢复备份保存在 ignored `artifacts/ui-parity/merge-verification-20261015/pr2/`；之后 PR #2 的 10 条已核验 review thread 均标记 resolved。
 
-截至 2026-10-15 的记录，本分支 PR #3 完整验证及新增回归见下文，当时尚未合并 PR #3。没有 `db:reset`。S2 仍未开始。
+截至 2026-10-15 的记录，本分支 PR #3 完整验证及新增回归见下文，当时尚未合并 PR #3。没有 `db:reset`。S2 后续实施状态见本文档顶部与 S2-02 当前实施记录。
 
 ## PR #3 复审补充（2026-10-20）
 
@@ -54,7 +72,7 @@ PR #3 的新意见在该记录时仍保持远端未解决状态；以下本地�
 
 复用检查：参考 [React 官方渲染列表与 key 文档源码](https://github.com/reactjs/react.dev/blob/main/src/content/learn/rendering-lists.md)，没有找到需要引入的外部实现；按当前静态有序列表使用序号 key，不复制代码或引入依赖。实现前还阅读了本地 Next.js 16.3.5 `data-security.md`、`server-actions.md` 与 `Link` 文档，依据 RSC/Flight 序列化边界加原始载荷回归；未采用外部框架或测试基础设施。
 
-本轮没有 push、创建 PR、评论或关闭 GitHub 线程，也没有 merge。S2 等待更新既有 PR、用户授权合并及合并基线复验；PR #2/#3 的合并依赖及次序保持不变。
+本轮复审阶段没有 push、创建 PR、评论或关闭 GitHub 线程，也没有 merge；当时下一步仍是开始 S2。此后状态见本文档顶部的 S2-02 当前实施记录。PR #2/#3 的合并依赖及次序保持不变。
 
 ## Codex 评审修复历史记录（2026-10-02，按当时状态）
 
@@ -180,11 +198,11 @@ S1-06 的验收与文档提交见 `eb38dc6`。
 ## 已知限制与交接（更新至 2026-10-20）
 
 - 当前是本地合成数据演示，不是生产部署；没有 CI、备份、生产监控或用户级 RLS。
-- S2-01 已实现 Builder 申请与企业选择，项目选择后进入 `AWAITING_BUILDER`；整体仍**不是完整交易闭环**，Builder 押金、开工和 Workspace 尚未开始（S2-02）。
+- S2-01 已实现 Builder 申请与企业选择，项目选择后进入 `AWAITING_BUILDER`；S2-02 的 Builder Mock 押金、开工和只读 Workspace 已通过本轮本地验证。S3 的成果提交与验收尚未实现，因此端到端交付链仍未完成。
 - S1 不提供解锁、下架、重新发布或修改已公开内容；已发布快照、锁定范围与 Spec 历史都不可改写。
 - Mock 定金与 Mock AIPM 都不代表真实收付、真实模型或合同接受；演示金额为固定 fixture，不是已确定的定金标准。
 - Spec 可见性细则、报价能力、价格模式与选择后二次接受仍是 Pending Product Decisions。
-- 下一任务是 S2-02，仍按独立 PLAN → EXECUTE → REVIEW 流程实施和验收。
+- S2-02 本地实现、验收与主模型审核均已通过；S3 成果提交、逐条验收与项目完成状态仍属后续 Slice。
 
 ---
 
