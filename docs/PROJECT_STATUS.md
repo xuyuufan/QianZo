@@ -1,8 +1,8 @@
 # Qianzo 项目状态
 
-更新时间：2026-10-20（PR #4 角色导航 P2 已本地修复并通过 targeted 验证；主模型复审 PASS）
+更新时间：2026-10-20（PR #4 角色导航及后续动作重放意见均已本地修复、定向验证并通过主模型复审）
 
-当前分支：`codex/s2-applications`，本地基线 HEAD `a8e960b6f80140472a4d99a424b447233f6397cd`，基于已同步的 `main` `185fd06d99a8de092963bd94b22dd38e5668a6bc`。PR #2/#3 已合并。S2-01 提交 `d1a3453` 与 S2-02 提交 `8e80bbf` 已发布为 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)，base 为 `main`，尚未合并。2026-10-20 15:24 UTC 自动评审只有一条 P2，已在本地修复。本次本地复审记录时尚未更新远端；自动评审结论仍对应修复前 `a8e960b`，不能据此声称修复后自动评审通过。
+当前分支：`codex/s2-applications`，本轮复审基线 HEAD `3751841f4b7c7b1a582916826e727df67f6ac3af`，基于已同步的 `main` `185fd06d99a8de092963bd94b22dd38e5668a6bc`。PR #2/#3 已合并。S2-01 提交 `d1a3453` 与 S2-02 提交 `8e80bbf` 已发布为 [PR #4](https://github.com/xuyuufan/QianZo/pull/4)，base 为 `main`，尚未合并。首轮自动评审在 `a8e960b` 上报告一条角色导航 P2，已本地修复；后续自动评审在 `3751841` 上报告发布重放 P2。主模型检查同类动作时另发现选人重放问题；两项本地修复均经定向验证及主模型复审 PASS。本次本地复审记录时修复尚未更新远端；自动评审结论仍对应修复前 `3751841`，不能据此声称修复后自动评审通过。
 
 远端基线：[PR #2](https://github.com/xuyuufan/QianZo/pull/2) merge commit `6a9e5a9e0c79258953122022952e0c7538d3e985`；[PR #3](https://github.com/xuyuufan/QianZo/pull/3) merge commit `185fd06d99a8de092963bd94b22dd38e5668a6bc`。合并后的 main tree 为 `a62f4dd3907513faead7a42039ecbce4a96aac36`，与 PR #3 最终修复 head `126848a` 的 tree 相同；本次复核 `git diff --exit-code 126848a origin/main` 返回 0。
 
@@ -12,11 +12,19 @@
 
 ## PR #4 Workspace 角色导航复审（2026-10-20）
 
-[PR #4 唯一 P2](https://github.com/xuyuufan/QianZo/pull/4#discussion_r4326774397)指出：Workspace 页面用账号全局 `ENTERPRISE` 角色决定 Header，导致同时持有 `ENTERPRISE` 与 `BUILDER` 的账号作为他人项目的已选 Builder 时仍看到企业导航与企业返回链接。Repository 已在同一请求中验证 owner 与当前 `ENGAGED` Builder 的项目关系；本地修复在其白名单 DTO 中增加不敏感的 `viewerRole: "owner" | "builder"`，由授权分支生成。页面据此显示对应导航，Builder 返回 `/builder/applications` 并标注“返回我的申请”，Owner 仍返回 `/enterprise/projects`。不向 DTO 加入 `ownerId`，外部参与者仍得到 404。
+[首轮自动评审中的唯一 P2](https://github.com/xuyuufan/QianZo/pull/4#discussion_r4326774397)指出：Workspace 页面用账号全局 `ENTERPRISE` 角色决定 Header，导致同时持有 `ENTERPRISE` 与 `BUILDER` 的账号作为他人项目的已选 Builder 时仍看到企业导航与企业返回链接。Repository 已在同一请求中验证 owner 与当前 `ENGAGED` Builder 的项目关系；本地修复在其白名单 DTO 中增加不敏感的 `viewerRole: "owner" | "builder"`，由授权分支生成。页面据此显示对应导航，Builder 返回 `/builder/applications` 并标注“返回我的申请”，Owner 仍返回 `/enterprise/projects`。不向 DTO 加入 `ownerId`，外部参与者仍得到 404。
 
 复用检查先沿用现有 Workspace repository 授权判断、白名单 DTO、`ProjectHeader` 与产品导航。Next.js 16.3.5 本地指南 `node_modules/next/dist/docs/01-app/02-guides/data-security.md` 建议由服务端数据访问层检查授权并返回最小 DTO；[Vercel 官方指南源码](https://github.com/vercel/next.js/blob/canary/docs/01-app/02-guides/data-security.mdx)用于核对原则。[Supabase 官方 Next.js 用户管理示例](https://github.com/supabase/supabase/tree/master/examples/user-management/nextjs-user-management)聚焦个人资料与 RLS，没有本项目所需的 owner/engaged-Builder 关系逻辑；本地不采用其代码或引入依赖。
 
 修复前 synthetic 双角色 Builder 在 production E2E 中找不到 Workspace 的“开发者导航”，复现了该意见。修复后 `typecheck`、`lint`、Builder 开工 targeted PostgreSQL/Auth integration（3/3）和 `tests/e2e/applications.spec.ts` production E2E（1/1）通过；E2E 验证双角色 Builder 返回“我的申请”并重新进入 Workspace、双角色 Owner 显示需求方导航，以及其他企业和 Builder 仍为 404。未重跑完整 unit、integration 或 E2E 套件。验证日志及退出码在忽略目录 `artifacts/ui-parity/s2-02/pr4-role-review/`；首次在 Docker 未运行时的 Auth 连接失败单独保留，随后启动本地 Docker/Supabase 并完成产品红例与绿验证。`supabase migration list --local` 确认现有 11 条 migration 全部应用；本轮未运行 `db:prepare`、`db:reset`，未修改演示用户。代码与验证已通过主模型复审；本次本地复审记录时尚未更新远端，自动评审结论对应修复前 `a8e960b`，不代表修复后自动评审通过。
+
+## PR #4 后续动作重放复审（2026-10-20；主模型复审 PASS）
+
+[后续自动评审意见](https://github.com/xuyuufan/QianZo/pull/4#discussion_r4327003815)报告发布重放缺陷：项目从 `OPEN` 进入 `AWAITING_BUILDER` 或 `IN_PROGRESS` 后，原始发布请求用初始 `expectedVersion` 重放会误报版本冲突。主模型检查同类后续动作时另外发现，已选申请进入 `IN_PROGRESS` 后重放相同选人请求也会误报冲突。发布重放现依据不可变 `publishedAt` 识别已发布项目，仍比较锁定 Spec、标题和规范化文档；相同预览返回当前项目，不同预览仍报 `PUBLISH_CONFLICT`。选人重放仅在 `AWAITING_BUILDER` 或 `IN_PROGRESS` 且选中申请 ID 相同时成功。原有项目行锁、owner/ACTIVE `ENTERPRISE` 授权及不同申请冲突保持不变，无 migration。
+
+复用检查沿用现有 `withProjectLock` 和领域重放分支。[PostgreSQL 官方锁管理源码](https://github.com/postgres/postgres/blob/master/src/backend/storage/lmgr/README)与 [Drizzle PostgreSQL `transaction` 实现](https://github.com/drizzle-team/drizzle-orm/blob/main/drizzle-orm/src/pg-core/db.ts)只用于核对锁/事务语义；没有可直接采用的项目级重放实现，因此不复制外部代码或引入依赖。
+
+修复前真实 PostgreSQL/Auth 回归复现选定 Builder 后的发布冲突，以及开工后原发布和原选人请求均失败。修复后串行 targeted integration 通过：`publish-recruitment` 16/16、`builder-start` 4/4、`applications` 5/5；typecheck 与 lint 通过。测试核验项目状态、版本、发布时间与更新时间、快照、已选申请、开工时间以及相关申请、押金和 Milestone 均未因重放或冲突请求改变。红绿日志与退出码保存在忽略目录 `artifacts/ui-parity/s2-02/pr4-publish-replay/`。使用本地 `D:\node.exe` 和已安装 Vitest 5.0.1；`pnpm exec` 的 Windows 锁文件移动错误单独记录为环境失败，未改 lockfile。未重跑全套 unit/integration/E2E，未运行 `db:prepare`、`db:reset` 或修改演示用户。本地修复已通过主模型复审；本次复审记录时远端仍对应 `3751841`，自动评审不代表修复后通过。
 
 ## S2-01 当前实施（2026-10-20）
 

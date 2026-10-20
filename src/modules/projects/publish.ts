@@ -40,7 +40,7 @@ export async function publishProjectWithDatabase(
         // Repeating the same published intent returns the current result;
         // anything else cannot rewrite the snapshot that is already public.
         // This runs before the locked-scope checks on purpose.
-        if (project.status === "OPEN") {
+        if (project.publishedAt) {
           const published = parseRecruitmentSnapshot(project.publishedSpecSnapshot);
           const sameResult =
             published !== null &&

@@ -7,6 +7,7 @@ import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { completeOnboardingWithDatabase, type Actor } from "@/modules/identity/onboarding";
+import { applyToProjectWithDatabase, selectApplicationWithDatabase } from "@/modules/applications/repository";
 import { simulatePaymentSuccessWithDatabase } from "@/modules/payments/repository";
 import { publishProjectWithDatabase } from "@/modules/projects/publish";
 import { saveReferenceBudgetWithDatabase } from "@/modules/projects/repository";
@@ -94,10 +95,14 @@ async function rawProject(projectId: string) {
       status: string;
       version: number;
       published_at: Date | null;
+      updated_at: Date;
       published_spec_snapshot: unknown;
+      selected_application_id: string | null;
+      started_at: Date | null;
     }[]
   >`
-    select status, version, published_at, published_spec_snapshot
+    select status, version, published_at, updated_at, published_spec_snapshot,
+      selected_application_id, started_at
     from app.projects where id = ${projectId}
   `;
   return row;
@@ -339,6 +344,37 @@ describe("publish transaction", () => {
 
     const afterConflict = await rawProject(fixture.project.id);
     expect(afterConflict.published_spec_snapshot).toEqual(afterReplay.published_spec_snapshot);
+  });
+
+  it("replays the original publish intent after a Builder has been selected", async () => {
+    const { fixture, projectVersion } = await createDepositPaidProject(database, enterpriseA);
+    const masked = validSpecDocument();
+    const originalInput = publishInput(fixture, projectVersion, masked);
+    const published = await publishProjectWithDatabase(database, enterpriseA, originalInput);
+    const application = await applyToProjectWithDatabase(database, builder, {
+      projectId: fixture.project.id,
+      statement: "Still interested after reviewing the scope.",
+    });
+    await selectApplicationWithDatabase(database, enterpriseA, {
+      projectId: fixture.project.id,
+      applicationId: application.applicationId,
+      expectedVersion: published.version,
+    });
+
+    const beforeReplay = await rawProject(fixture.project.id);
+    expect(beforeReplay.status).toBe("AWAITING_BUILDER");
+    const replay = await publishProjectWithDatabase(database, enterpriseA, originalInput);
+    expect(replay.status).toBe("AWAITING_BUILDER");
+    expect(await rawProject(fixture.project.id)).toEqual(beforeReplay);
+
+    const changedTitle = publishInput(fixture, projectVersion, masked, {
+      maskedTitle: "不同的招募标题",
+    });
+    await expect(publishProjectWithDatabase(database, enterpriseA, changedTitle)).rejects.toMatchObject({
+      name: "ProjectError",
+      code: "PUBLISH_CONFLICT",
+    });
+    expect(await rawProject(fixture.project.id)).toEqual(beforeReplay);
   });
 
   it("keeps the published-state rules in the database", async () => {

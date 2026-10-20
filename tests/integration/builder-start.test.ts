@@ -67,15 +67,16 @@ async function createPublishedProject(owner: Actor, title: string, document = va
     originalRequirement: `PRIVATE requirement ${title}`,
     document,
   });
-  const project = await publishProjectWithDatabase(database, owner, {
+  const publicationInput = {
     projectId: paid.fixture.project.id,
     expectedVersion: paid.projectVersion,
     lockedSpecVersionId: paid.fixture.specVersion.id,
     maskedTitle: title,
     maskedDocument: document,
     confirmed: "on",
-  });
-  return { project, specVersionId: paid.fixture.specVersion.id };
+  };
+  const project = await publishProjectWithDatabase(database, owner, publicationInput);
+  return { project, specVersionId: paid.fixture.specVersion.id, publicationInput };
 }
 
 async function selectFromOpenProject(owner: Actor, project: Awaited<ReturnType<typeof createPublishedProject>>["project"], selected: Actor, other?: Actor) {
@@ -89,12 +90,13 @@ async function selectFromOpenProject(owner: Actor, project: Awaited<ReturnType<t
         statement: `Statement from ${other.displayName}.`,
       })
     : null;
-  await selectApplicationWithDatabase(database, owner, {
+  const selectionInput = {
     projectId: project.id,
     applicationId: selectedApplication.applicationId,
     expectedVersion: project.version,
-  });
-  return { selectedApplication, otherApplication };
+  };
+  await selectApplicationWithDatabase(database, owner, selectionInput);
+  return { selectedApplication, otherApplication, selectionInput };
 }
 
 async function countBuilderPayments(projectId: string) {
@@ -104,6 +106,40 @@ async function countBuilderPayments(projectId: string) {
     where project_id = ${projectId} and purpose = 'BUILDER_DEPOSIT'
   `;
   return Number(row.count);
+}
+
+async function readReplayState(projectId: string) {
+  const [project] = await admin<
+    {
+      status: string;
+      version: number;
+      published_at: Date | null;
+      updated_at: Date;
+      published_spec_snapshot: unknown;
+      selected_application_id: string | null;
+      started_at: Date | null;
+    }[]
+  >`
+    select status, version, published_at, updated_at, published_spec_snapshot,
+      selected_application_id, started_at
+    from app.projects where id = ${projectId}
+  `;
+  const applications = await admin<{ id: string; status: string; updated_at: Date }[]>`
+    select id, status, updated_at from app.applications where project_id = ${projectId} order by id
+  `;
+  const payments = await admin<
+    { id: string; purpose: string; status: string; succeeded_at: Date | null; updated_at: Date }[]
+  >`
+    select id, purpose, status, succeeded_at, updated_at from app.payments
+    where project_id = ${projectId} order by purpose
+  `;
+  const milestones = await admin<
+    { id: string; position: number; status: string; deadline: Date; spec_version_id: string }[]
+  >`
+    select id, position, status, deadline, spec_version_id from app.milestones
+    where project_id = ${projectId} order by position
+  `;
+  return { project, applications, payments, milestones };
 }
 
 beforeAll(async () => {
@@ -176,6 +212,88 @@ afterAll(async () => {
 });
 
 describe("Builder Mock deposit and atomic project start", () => {
+  it("replays the original publish and selection intents after start without changing state", async () => {
+    const document = validSpecDocument();
+    const { project, publicationInput } = await createPublishedProject(
+      enterpriseA,
+      "开工后重放项目",
+      document,
+    );
+    const { selectedApplication, otherApplication, selectionInput } = await selectFromOpenProject(
+      enterpriseA,
+      project,
+      builderA,
+      builderB,
+    );
+    if (!otherApplication) throw new Error("Expected an alternate submitted application.");
+
+    const payment = await createBuilderDepositWithDatabase(database, builderA, mockPaymentProvider, {
+      projectId: project.id,
+    });
+    await simulateBuilderDepositSuccessWithDatabase(database, builderA, {
+      projectId: project.id,
+      paymentId: payment.id,
+    });
+
+    const beforeReplay = await readReplayState(project.id);
+    expect(beforeReplay.project.status).toBe("IN_PROGRESS");
+    expect(beforeReplay.project.selected_application_id).toBe(selectedApplication.applicationId);
+    expect(beforeReplay.project.started_at).toBeInstanceOf(Date);
+
+    // Keep both old requests in flight against the same real, post-start state
+    // so the pre-fix integration test records each replay failure.
+    const [publishResult, selectionResult] = await Promise.allSettled([
+      publishProjectWithDatabase(database, enterpriseA, publicationInput),
+      selectApplicationWithDatabase(database, enterpriseA, selectionInput),
+    ]);
+    expect.soft(publishResult.status).toBe("fulfilled");
+    expect.soft(selectionResult.status).toBe("fulfilled");
+    if (publishResult.status !== "fulfilled" || selectionResult.status !== "fulfilled") {
+      throw new Error("Expected both original intents to replay successfully after start.");
+    }
+    expect(publishResult.value.status).toBe("IN_PROGRESS");
+    expect(selectionResult.value).toEqual({
+      applicationId: selectedApplication.applicationId,
+      version: beforeReplay.project.version,
+      alreadySelected: true,
+    });
+    expect(await readReplayState(project.id)).toEqual(beforeReplay);
+
+    const changedDocument = structuredClone(document);
+    changedDocument.projectGoal = "不同的发布预览。";
+    await expect(
+      publishProjectWithDatabase(database, enterpriseA, {
+        ...publicationInput,
+        maskedDocument: changedDocument,
+      }),
+    ).rejects.toMatchObject({ name: "ProjectError", code: "PUBLISH_CONFLICT" });
+    await expect(
+      selectApplicationWithDatabase(database, enterpriseA, {
+        ...selectionInput,
+        applicationId: otherApplication.applicationId,
+      }),
+    ).rejects.toMatchObject({ name: "ApplicationError", code: "VERSION_CONFLICT" });
+    expect(await readReplayState(project.id)).toEqual(beforeReplay);
+
+    await expect(publishProjectWithDatabase(database, enterpriseB, publicationInput)).rejects.toMatchObject({
+      name: "ProjectError",
+      code: "NOT_FOUND",
+    });
+    await expect(publishProjectWithDatabase(database, builderB, publicationInput)).rejects.toMatchObject({
+      name: "IdentityError",
+      code: "ROLE_REQUIRED",
+    });
+    await expect(selectApplicationWithDatabase(database, enterpriseB, selectionInput)).rejects.toMatchObject({
+      name: "ApplicationError",
+      code: "NOT_FOUND",
+    });
+    await expect(selectApplicationWithDatabase(database, builderB, selectionInput)).rejects.toMatchObject({
+      name: "IdentityError",
+      code: "ROLE_REQUIRED",
+    });
+    expect(await readReplayState(project.id)).toEqual(beforeReplay);
+  }, 60000);
+
   it("creates one fixed deposit, starts the project once and exposes a safe Workspace", async () => {
     const document = longValidDocument();
     expect(document.milestones[0].description.length).toBeGreaterThan(1000);

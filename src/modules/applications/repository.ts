@@ -177,7 +177,10 @@ export async function selectApplicationWithDatabase(database: Database, actor: A
       async (project) => {
         // A replay of the exact selected application succeeds even if its page
         // carries the pre-selection version. Other stale intents fail below.
-        if (project.status === "AWAITING_BUILDER" && project.selectedApplicationId === input.applicationId) {
+        if (
+          (project.status === "AWAITING_BUILDER" || project.status === "IN_PROGRESS") &&
+          project.selectedApplicationId === input.applicationId
+        ) {
           return { applicationId: input.applicationId, version: project.version, alreadySelected: true };
         }
         if (project.version !== input.expectedVersion) {
